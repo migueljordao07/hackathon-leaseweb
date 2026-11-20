@@ -2,15 +2,15 @@
 id: WS3-01
 title: Create contract-honouring severance and LLM stubs
 workstream: WS3
-status: todo
-owner: null
+status: claimed
+owner: claude-3
 priority: P0
 depends_on: []
 blocks: [WS1-05, WS3-02, WS3-04, WS3-06, WS4-01]
 files: [skyshift/sever.py, skyshift/llm.py, skyshift/catalogue/replacements.yaml, fixtures/llm/replay.json, fixtures/ip-ranges/ranges.json, tests/ws3/__init__.py, tests/ws3/test_contract_stubs.py]
 estimate: 40m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T12:40:32+00:00"
+updated_at: "2026-11-20T12:40:32+00:00"
 ---
 
 ## Goal
@@ -38,3 +38,4 @@ Keep synthetic local fixtures and return the contract's incomplete envelope; rec
 
 ## Log
 - 2026-11-20 — Planned; no implementation or VM validation performed.
+- 2026-11-20T12:40:32+00:00 — Claimed by claude-3 (Claude Code); starting offline stubs only.
