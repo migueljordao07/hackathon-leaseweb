@@ -8,7 +8,8 @@ on the live path only; the ``stub=True`` path never touches them.
 discover (live, WS1-02): parses workload ``*.tf`` with python-hcl2 (no evaluation),
 scans ``*.py`` with ``ast`` (never executed), lists source buckets read-only with
 paginated ``list_objects_v2`` and computes the v1 readiness score deterministically.
-choose (live) remains an explicit not-implemented incomplete envelope until WS1-03.
+choose (live, WS1-03): deterministic Leaseweb selection from targets.yaml, the human VM
+gate record (tasks/WS0-setup/validation.md) and SKYSHIFT_TARGET_PROVIDER; prices stay null.
 No stub ever reports PASS.
 """
 
@@ -808,16 +809,189 @@ def choose(data_map: dict, *, config: dict, stub: bool = False) -> dict:
         ]
         return _envelope("choose", "stub", "incomplete", checks, data, [])
 
-    data = {
-        "target_id": None,
-        "operator": "Leaseweb",
-        "jurisdiction": None,
-        "storage_mode": None,
-        "criteria": [],
-        "prices": [],
-        "explanation": {"mode": "replay", "text": "not generated: live choice not implemented"},
-    }
-    checks = [{"id": "provider_availability", "status": "incomplete",
-               "detail": "live choice not implemented yet (WS1-03)"}]
-    return _envelope("choose", "live", "incomplete", checks, data,
-                     ["live target choice not implemented"])
+    return _live_choose(config)
+
+
+# ------------------------------------------------------------------ live choice (WS1-03)
+
+TARGETS_PATH = Path(__file__).resolve().parent / "catalogue" / "targets.yaml"
+GATE_RECORD_PATH = Path(__file__).resolve().parents[1] / "tasks" / "WS0-setup" / "validation.md"
+GATE_DECISIONS_GO = ("go-with-fallback", "go")
+TARGET_REQUIRED = ("target_id", "operator", "jurisdiction", "storage_mode", "provider_modes",
+                   "criteria", "prices")
+
+
+def load_targets(path: Path = TARGETS_PATH) -> list[dict]:
+    """Load the Leaseweb-only target catalogue (JSON-subset YAML, stdlib json)."""
+    import json
+
+    with open(path, encoding="utf-8") as handle:
+        doc = json.load(handle)
+    if not isinstance(doc, dict) or doc.get("schema_version") != 1:
+        raise ValueError("targets.yaml must have schema_version: 1")
+    targets = doc.get("targets")
+    if not isinstance(targets, list) or not targets:
+        raise ValueError("targets.yaml needs a non-empty targets list")
+    for t in targets:
+        if not isinstance(t, dict) or any(k not in t for k in TARGET_REQUIRED):
+            raise ValueError("targets.yaml entry is incomplete")
+        if t["operator"] != "Leaseweb":
+            raise ValueError("targets.yaml may only contain Leaseweb targets")
+        for price in t["prices"]:
+            if price.get("amount") is not None and not price.get("source_url"):
+                raise ValueError(f"{t['target_id']}: numeric price without a source_url")
+    return targets
+
+
+def _section(text: str, heading_prefix: str) -> str | None:
+    match = re.search(rf"^## {re.escape(heading_prefix)}.*?$(.*?)(?=^## |\Z)", text,
+                      re.MULTILINE | re.DOTALL)
+    return match.group(1) if match else None
+
+
+def parse_gate_record(text: str) -> dict:
+    """Extract the sanitized human gate decision; unknown fields stay None/False."""
+    decision_body = _section(text, "Human decision") or ""
+    decision = None
+    if re.search(r"Signed:\s*\S", decision_body):
+        m = re.search(r"\b(go-with-fallback|go|switch)\b", decision_body)
+        decision = m.group(1) if m else None
+    pm = re.search(r"Provider choice:\s*([A-Za-z][A-Za-z0-9_-]*)", text)
+    check1 = _section(text, "1.") or ""
+    native = bool(re.search(r"Leaseweb (bucket|Object Storage)", check1)
+                  and re.search(r"Result:\s*\*\*PASS\*\*", check1))
+    return {"decision": decision, "provider": pm.group(1).lower() if pm else None,
+            "native_storage_verified": native, "selfhosted_verified": False,
+            "source": "tasks/WS0-setup/validation.md"}
+
+
+def read_gate_record(path: Path = GATE_RECORD_PATH) -> dict | None:
+    try:
+        return parse_gate_record(path.read_text(encoding="utf-8"))
+    except OSError:
+        return None
+
+
+def select_target(targets: list[dict], gate: dict | None, provider_config: str | None) -> dict:
+    """Pure deterministic selection. Returns {target, provider, checks, open_items, reasons}."""
+    checks: list[dict] = []
+    open_items: list[str] = []
+    reasons: list[str] = []
+    gate_provider = gate.get("provider") if gate else None
+    decision = gate.get("decision") if gate else None
+    provider = (provider_config or "").strip().lower() or None
+
+    if decision not in GATE_DECISIONS_GO:
+        checks.append({"id": "provider_approved", "status": "incomplete",
+                       "detail": f"no signed human go decision in the VM gate record "
+                                 f"(decision={decision})"})
+        open_items.append("human VM gate go/provider decision missing")
+        provider = None
+    elif provider is None and gate_provider:
+        provider = gate_provider
+        checks.append({"id": "provider_approved", "status": "PASS",
+                       "detail": f"provider {provider} from signed gate record ({decision}); "
+                                 "SKYSHIFT_TARGET_PROVIDER not set"})
+    elif provider and provider == gate_provider:
+        checks.append({"id": "provider_approved", "status": "PASS",
+                       "detail": f"SKYSHIFT_TARGET_PROVIDER={provider} matches signed gate "
+                                 f"record ({decision})"})
+    else:
+        checks.append({"id": "provider_approved", "status": "incomplete",
+                       "detail": f"configured provider {provider!r} not approved by gate "
+                                 f"(gate provider {gate_provider!r})"})
+        open_items.append("configured provider is not the human-approved provider")
+        provider = None
+
+    chosen = None
+    if provider:
+        eligible = [t for t in targets if provider in t["provider_modes"]]
+        by_mode = {t["storage_mode"]: t for t in eligible}
+        if gate.get("native_storage_verified") and "native_s3" in by_mode:
+            chosen = by_mode["native_s3"]
+            reasons.append("native Leaseweb Object Storage measured accessible in VM gate check 1")
+            checks.append({"id": "storage_verified", "status": "PASS",
+                           "detail": "native Leaseweb Object Storage put/get/list PASS in gate "
+                                     "check 1 (single small object; path-style)"})
+        elif gate.get("selfhosted_verified") and "self_hosted_s3" in by_mode:
+            chosen = by_mode["self_hosted_s3"]
+            reasons.append("native storage not verified; self-hosted S3 human-verified accessible")
+            checks.append({"id": "storage_verified", "status": "PASS",
+                           "detail": "self-hosted S3 human-verified accessible"})
+        else:
+            checks.append({"id": "storage_verified", "status": "incomplete",
+                           "detail": "neither native nor self-hosted storage verified accessible"})
+            open_items.append("no verified accessible Leaseweb storage option")
+    else:
+        checks.append({"id": "storage_verified", "status": "incomplete",
+                       "detail": "not evaluated: no approved provider"})
+    if chosen:
+        reasons.insert(0, f"human-approved provider {provider} ({decision})")
+        unknown = [p["item"] for p in chosen["prices"] if p.get("amount") is None]
+        if unknown:
+            open_items.append("prices unverified (null): " + ", ".join(unknown))
+    return {"target": chosen, "provider": provider, "checks": checks,
+            "open_items": open_items, "reasons": reasons}
+
+
+EXPLANATION_SCHEMA = {
+    "type": "object",
+    "required": ["text"],
+    "properties": {"text": {"type": "string", "maxLength": 800}},
+    "additionalProperties": False,
+}
+
+
+def _explain(payload: dict, deterministic_text: str, config: dict) -> dict:
+    """Optional narrative via skyshift.llm.complete; never affects the selection or checks."""
+    try:
+        from skyshift import llm
+
+        result = llm.complete("choose_explanation", payload, EXPLANATION_SCHEMA, config=config)
+    except Exception as exc:  # explanation is optional; selection stays deterministic
+        return {"mode": "replay", "text": deterministic_text, "deterministic": deterministic_text,
+                "model_status": "incomplete", "model_errors": [type(exc).__name__]}
+    text = (result.get("data") or {}).get("text") if isinstance(result, dict) else None
+    mode = result.get("mode") if isinstance(result, dict) else None
+    return {"mode": mode if mode in ("live", "replay") else "replay",
+            "text": text if isinstance(text, str) and text else deterministic_text,
+            "deterministic": deterministic_text,
+            "model_status": result.get("status") if isinstance(result, dict) else "incomplete",
+            "model_errors": list(result.get("errors", [])) if isinstance(result, dict) else []}
+
+
+def _live_choose(config: dict, *, gate: dict | None = None, targets: list[dict] | None = None,
+                 explain=None) -> dict:
+    targets = load_targets() if targets is None else targets
+    gate = read_gate_record() if gate is None else gate
+    sel = select_target(targets, gate, config.get("SKYSHIFT_TARGET_PROVIDER"))
+    chosen = sel["target"]
+    checks = sel["checks"]
+    if chosen is None:
+        data = {"target_id": None, "operator": "Leaseweb", "jurisdiction": None,
+                "storage_mode": None, "criteria": [], "prices": [],
+                "explanation": {"mode": "replay", "text": "no target selected: " +
+                                "; ".join(sel["open_items"]), "deterministic": True},
+                "provider": sel["provider"], "open_items": sel["open_items"]}
+        return _envelope("choose", "live", "incomplete", checks, data,
+                         [f"{c['id']}: {c['detail']}" for c in checks if c["status"] != "PASS"])
+    det_text = (f"Selected {chosen['target_id']} ({chosen['storage_mode']}) deterministically: "
+                + "; ".join(sel["reasons"]) + ". Prices remain null (unverified); API "
+                "coverage is measured by parity, not claimed here.")
+    payload = {"target_id": chosen["target_id"], "storage_mode": chosen["storage_mode"],
+               "provider": sel["provider"], "reasons": sel["reasons"],
+               "unknown_prices": [p["item"] for p in chosen["prices"] if p["amount"] is None]}
+    explanation = (explain or _explain)(payload, det_text, config)
+    criteria = [dict(c) for c in chosen["criteria"]] + [
+        {"name": "provider_availability", "value": sel["provider"],
+         "source_url": None, "evidence": "tasks/WS0-setup/validation.md (signed human gate)"},
+        {"name": "native_storage_verified", "value": chosen["storage_mode"] == "native_s3",
+         "source_url": None, "evidence": "tasks/WS0-setup/validation.md check 1"},
+    ]
+    data = {"target_id": chosen["target_id"], "operator": chosen["operator"],
+            "jurisdiction": chosen["jurisdiction"], "storage_mode": chosen["storage_mode"],
+            "criteria": criteria, "prices": [dict(p) for p in chosen["prices"]],
+            "explanation": explanation, "provider": sel["provider"],
+            "open_items": sel["open_items"]}
+    return _envelope("choose", "live", _overall(checks), checks, data,
+                     [f"{c['id']}: {c['detail']}" for c in checks if c["status"] != "PASS"])

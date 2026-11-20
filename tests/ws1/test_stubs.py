@@ -174,12 +174,9 @@ class StubPipelineTest(unittest.TestCase):
             choose({"resources": []}, config=CONFIG, stub=True)
 
     def test_non_stub_is_incomplete_not_live_pass(self):
-        live = [
-            discover(self.workload, config=CONFIG),
-            choose(self.disc["data"], config=CONFIG),
-            translate(self.disc["data"], self.choice["data"],
-                      output_dir=Path(self._tmp.name) / "live", config=CONFIG),
-        ]
+        # Live choose/translate are real since WS1-03/04 (see test_choice.py and
+        # test_templates.py); only discover without credentials is checked here.
+        live = [discover(self.workload, config=CONFIG)]
         for record in live:
             self.assertEqual(set(record), ENVELOPE_KEYS)
             self.assertEqual(record["mode"], "live")
@@ -187,8 +184,6 @@ class StubPipelineTest(unittest.TestCase):
             # checks may PASS once discovery is real, WS1-02).
             self.assertEqual(record["status"], "incomplete")
             self.assertTrue(record["errors"])
-        for record in live[1:]:  # choose/translate are still placeholders
-            self.assertNotIn("PASS", list(_walk_statuses(record)))
         self.assertFalse((Path(self._tmp.name) / "live").exists())
 
 

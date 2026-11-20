@@ -1,0 +1,36 @@
+{
+  "_comment": "SkyShift target catalogue (WS1-03). JSON-subset YAML (parsed with stdlib json). Leaseweb-only options; no competitor targets. Runtime availability is NOT stored here: it comes from the human VM gate record (tasks/WS0-setup/validation.md) and SKYSHIFT_TARGET_PROVIDER. Prices stay null until an exact public source is cited.",
+  "schema_version": 1,
+  "targets": [
+    {
+      "target_id": "leaseweb-native",
+      "operator": "Leaseweb",
+      "jurisdiction": "EU",
+      "storage_mode": "native_s3",
+      "provider_modes": ["openstack"],
+      "criteria": [
+        {"name": "operator_jurisdiction", "value": "EU (Leaseweb, Netherlands-headquartered operator)", "source_url": "https://www.leaseweb.com/", "retrieved": "2026-11-20", "assumptions": "operator headquarters from the public site; not a legal opinion on data jurisdiction"},
+        {"name": "storage_service", "value": "Leaseweb Object Storage (S3-compatible, path-style)", "source_url": "https://www.leaseweb.com/", "retrieved": "2026-11-20", "assumptions": "accessibility comes from the VM gate measurement, not from this catalogue entry"}
+      ],
+      "prices": [
+        {"item": "compute", "amount": null, "currency": "EUR", "unit": "hour", "source_url": null, "assumptions": "not verified: exact instance flavor/region price not cited"},
+        {"item": "object_storage", "amount": null, "currency": "EUR", "unit": "GB-month", "source_url": null, "assumptions": "not verified: storage, request and egress pricing not cited; taxes unknown"}
+      ]
+    },
+    {
+      "target_id": "leaseweb-selfhosted",
+      "operator": "Leaseweb",
+      "jurisdiction": "EU",
+      "storage_mode": "self_hosted_s3",
+      "provider_modes": ["openstack"],
+      "criteria": [
+        {"name": "operator_jurisdiction", "value": "EU (Leaseweb, Netherlands-headquartered operator)", "source_url": "https://www.leaseweb.com/", "retrieved": "2026-11-20", "assumptions": "operator headquarters from the public site; not a legal opinion on data jurisdiction"},
+        {"name": "storage_service", "value": "separately operated S3-compatible service on Leaseweb compute", "source_url": null, "retrieved": null, "assumptions": "service deployment is a manual requirement; not provisioned by SkyShift"}
+      ],
+      "prices": [
+        {"item": "compute", "amount": null, "currency": "EUR", "unit": "hour", "source_url": null, "assumptions": "not verified: exact instance flavor/region price not cited"},
+        {"item": "block_storage", "amount": null, "currency": "EUR", "unit": "GB-month", "source_url": null, "assumptions": "not verified: volume pricing not cited; taxes unknown"}
+      ]
+    }
+  ]
+}
