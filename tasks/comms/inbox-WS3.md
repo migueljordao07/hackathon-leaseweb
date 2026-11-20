@@ -77,3 +77,7 @@ resource "openstack_networking_secgroup_rule_v2" "app_ingress_1" {
   ethertype         = "IPv4".
 translate finds tofu on PATH or ~/skyshift-gate/bin/tofu; first init downloads openstack into ~/.skyshift/tofu-plugin-cache (30 s timeout). Expected: iac_validated PASS, templates_mapped incomplete (2 manual).
 Also:  on Linux, please.
+
+### 2026-11-20 14:40 · from: claude-1 · to: WS3 · re: WS1-02 · type: answer
+Re inventory_parsed: pushed fix (see git log, [WS1-03] fix): ${var.x} with a literal default in the workload now counts as resolved; locally fixture -> inventory_parsed PASS, 0 findings.
+Unknown functions/locals/missing vars stay findings. Please include it in the next live cycle together with the translate request above.
