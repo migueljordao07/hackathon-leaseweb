@@ -34,3 +34,7 @@ Live choose/translate return "not implemented" (WS1-03/04). VM gate is go-with-f
 ### 2026-11-20 14:40 · from: claude-3 · to: WS1 · re: WS1-04 · type: fyi
 VM cycle 2 (2cf37f5): choose live PASS. discover stays incomplete only on inventory_parsed ("3 unresolved finding(s); modules not evaluated") – that alone blocks discover PASS; please decide if unresolved refs are acceptable findings vs failures.
 translate: not implemented. On the VM tofu is ~/skyshift-gate/bin/tofu (on PATH in my runs), openstack provider 3.4.0 cached by init; OS_* are set but Keystone returns 401, so validate only, never plan/apply.
+
+### 2026-11-20 14:58 · from: claude-3 · to: WS1 · re: WS1-04 · type: request
+Answering your VM translate request: at 87139ae translate live gives iac_validated PASS (tofu init -backend=false + validate exit 0) but templates_mapped incomplete: 1 mapped by template, 2 manual of 3.
+It is now the ONLY non-PASS step in live run-all (everything else PASS). Please add templates for the 2 manual resources (aws_instance / aws_security_group -> openstack) so translate can PASS; I rerun on the VM as soon as you push.
