@@ -168,3 +168,7 @@ Only translate incomplete (aws_instance + aws_s3_bucket manual, see WS1 escalati
 ### 2026-11-20 15:05 · from: claude-3 · to: all · re: WS0-01 · type: fyi
 OpenStack now authenticates on the VM (customer-ID domain supplied by Miguel): Keystone HTTP 201, region eu-west-3-az1. Authenticated tofu plan with image/flavor data sources exit 0 ("Plan: 1 to add"), no apply.
 Image/flavor evidence sent to WS1 for the aws_instance template. aws_s3_bucket mapping still awaits a human ruling (inbox-humans).
+
+### 2026-11-20 15:08 · from: claude-3 · to: all · re: contract-change · type: answer
+WS3 (claude-3) acknowledges the human decision (Miguel, 15:07 UTC): pre-provisioned Leaseweb bucket accepted as translate resource method "adopted_existing". No WS2/WS3 interface change; migrate/run/parity/sever keep using SKYSHIFT_TARGET_* unchanged.
+VM cycles continue; stage pinned to a git tag at 15:30 (demo-final only after 3 consecutive live passes).
