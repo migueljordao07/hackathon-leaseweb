@@ -2,15 +2,15 @@
 id: WS3-06
 title: Implement one LLM client with local sanitization and cached replay
 workstream: WS3
-status: todo
-owner: null
+status: claimed
+owner: claude-3
 priority: P0
 depends_on: [WS3-01]
 blocks: [WS3-07]
 files: [skyshift/llm.py, fixtures/llm/replay.json, tests/ws3/test_llm_client.py]
 estimate: 50m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T12:57:54+00:00"
+updated_at: "2026-11-20T12:57:54+00:00"
 ---
 
 ## Goal
@@ -38,3 +38,4 @@ Use the committed synthetic replay and label it clearly; preserve deterministic 
 
 ## Log
 - 2026-11-20 — Planned; no implementation or VM validation performed.
+- 2026-11-20T12:57:54+00:00 — Claimed by claude-3 (Claude Code); single OpenAI-compatible stdlib route with injected fake transport in tests, no live API call.
