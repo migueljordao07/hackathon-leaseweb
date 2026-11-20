@@ -2,15 +2,15 @@
 id: WS3-04
 title: Add Linux socket radar with explicit detection limits
 workstream: WS3
-status: todo
-owner: null
+status: claimed
+owner: claude-3
 priority: P0
 depends_on: [WS3-01]
 blocks: [WS3-05]
 files: [skyshift/sever.py, tests/ws3/test_socket_radar.py]
 estimate: 35m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T12:50:10+00:00"
+updated_at: "2026-11-20T12:50:10+00:00"
 ---
 
 ## Goal
@@ -38,3 +38,4 @@ Use only the fixture parser and return incomplete coverage with a clear reason; 
 
 ## Log
 - 2026-11-20 — Planned; no implementation or VM validation performed.
+- 2026-11-20T12:50:10+00:00 — Claimed by claude-3 (Claude Code); detection-only radar with fixture-driven offline tests.
