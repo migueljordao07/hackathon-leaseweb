@@ -19,7 +19,7 @@ FIELDS = {"id", "title", "workstream", "status", "owner", "priority", "depends_o
           "blocks", "files", "estimate", "claimed_at", "updated_at"}
 LISTS = {"depends_on", "blocks", "files"}
 STATUSES = {"todo", "claimed", "in_progress", "blocked", "review", "done", "cut"}
-OWNERS = {None, "claude-1", "claude-2", "codex", "gemini"}
+OWNERS = {None, "claude-1", "claude-2", "claude-3", "gemini"}
 SECTIONS = ("Goal", "Context", "Steps", "Acceptance criteria", "Out of scope",
             "Fallback if blocked", "Log")
 ID = re.compile(r"WS[0-4]-(?:0[1-9]|[1-9][0-9])\Z")

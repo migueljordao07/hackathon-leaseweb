@@ -70,6 +70,12 @@ class BoardTests(unittest.TestCase):
         self.task.update(owner="claude-1", claimed_at="2026-11-20T12:00:00Z")
         self.assertEqual(board.validate([self.task]), [])
 
+    def test_reassigned_claude_owner(self):
+        self.task.update(owner="claude-3", status="claimed", claimed_at="2026-11-20T12:00:00Z")
+        self.assertEqual(board.validate([self.task]), [])
+        self.task["owner"] = "codex"
+        self.assertTrue(any("invalid owner" in e for e in board.validate([self.task])))
+
     def test_unsafe_paths(self):
         for file in ("../README.md", "/etc/passwd", "C:/private", "skyshift/*", ".env", ".env.local", "skyshift/"):
             with self.subTest(file=file):

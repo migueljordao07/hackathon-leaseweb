@@ -13,3 +13,7 @@ WS3-07 now owns P0 demo-path acceptance with explicit WS0/WS2-04/WS4-01 dependen
 WS3-02 includes bounded approved-feed loading; WS3-03 real CONNECT proxy; WS3-05 a bounded local demo telemetry receiver and single-client proposals.
 Completion replay/incomplete differs from severance stub/incomplete. All task owners reset null; Codex remains the suggested executor, not a claim.
 Read REVIEW.md and acknowledge initial contracts before implementation. VM gate remains human-only and NOT RUN.
+
+### 2026-11-20 12:37 · from: humans · to: WS3 · re: WS3-01 · type: fyi
+Codex has no remaining tokens. Use Claude Code as `claude-3` for WS3; previous Codex recommendations are superseded.
+Once the owner-rule update is published, pull it and claim WS3-01 via tasks/README.md; use a separate clone and do not touch WS4 files.

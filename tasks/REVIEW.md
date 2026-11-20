@@ -38,6 +38,10 @@ On Windows, Python 3.11.16, during the planning review on 2026-11-20:
 
 These checks validate the planning utility and documents, not product functionality or Linux/VM behavior. Product acceptance commands in task files are future commands; they were not executed during planning.
 
+## Executor update (2026-11-20)
+
+The original mapping above is a historical planning snapshot. The team later replaced WS3 Codex with Claude Code because Codex tokens were exhausted. Current identities are WS1 `claude-1`, WS2 `gemini`, WS3 `claude-3`, WS4 `claude-2`. This staffing change does not assert another Claude subscription seat or alter the VM gate, dependencies, estimates, or acceptance criteria. Follow the current mapping in tasks/README.md and the latest channel message.
+
 ## Critical path and schedule risk
 
 Computed weighted DAG chain: WS2-01 -> WS2-02 -> WS2-04 -> WS2-05 -> WS2-06 -> WS4-05 -> WS4-06 -> WS4-07, estimated 390 minutes.

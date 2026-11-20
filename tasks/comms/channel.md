@@ -31,3 +31,8 @@ WS1 claude-1, WS2 gemini, WS3 codex, WS4 claude-2; all tasks todo/unclaimed, VM 
 Initial contracts clarify data-object inputs/run-root outputs and distinct completion modes; acknowledge before implementation.
 Component acceptance must not wait for overall live PASS. WS3-07 now owns explicit gated demo-path verification.
 Critical-path lower bound is 390 estimated minutes; humans must replan scope/time, not promise original milestones.
+
+### 2026-11-20 12:37 · from: humans · to: all · re: WS3-staffing · type: fyi
+Codex is unavailable. WS3 is now assigned to a third Claude Code process with Git identity `claude-3`.
+Current mapping: WS1 claude-1, WS2 gemini, WS3 claude-3, WS4 claude-2; earlier staffing entries are superseded.
+WS3-01 is still the first claim. Separate clones and check Claude account concurrency limits; task dependencies are unchanged.

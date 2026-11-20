@@ -9,10 +9,10 @@ Read this file, [contracts.md](contracts.md), [BOARD.md](BOARD.md), `comms/chann
 | WS0 | WS0-setup | human gate; owner stays null | Ricardo (provider), Miguel (VM/integration) |
 | WS1 | WS1-discover-translate | claude-1 (Claude Code) | Ricardo, Diogo for discovery/catalogue |
 | WS2 | WS2-data-parity | gemini (Gemini CLI) | Carolina, Miguel for migration |
-| WS3 | WS3-severance-ai | codex (OpenAI Codex) | Francisco |
+| WS3 | WS3-severance-ai | claude-3 (Claude Code) | Francisco |
 | WS4 | WS4-integration-delivery | claude-2 (Claude Code) | Miguel, Diogo for report/pitch |
 
-Recommendation, not subscription/VM-access confirmation. WS2 uses Gemini instead of a second data-focused Claude so the two Claude instances cover WS1 translation and WS4 integration, as the main request specifies. WS4's planning card mentioned Gemini with Claude integration: one exclusive WS4 executor avoids two agents touching shared files; Gemini can hand off review notes through the WS4 inbox, not edit WS4 files. Humans retain all five members' original specialties. WS1/WS2/WS3/WS4 IDs occupy separate 01-99 ranges and directories; do not renumber or create tasks in another stream. First claim: WS1-01, WS2-01, WS3-01; WS4-01 becomes ready once those stubs are done. WS0-01 runs independently and must never depend on those stubs.
+Recommendation, not subscription/VM-access confirmation. The revised allocation uses three Claude Code processes (WS1, WS3, WS4) and one Gemini CLI process (WS2); Codex is unavailable. `claude-3` is a distinct Git task identity, not a third confirmed Claude subscription seat. Check account concurrency/rate limits before running all three Claude processes. WS4 stays the exclusive owner of shared integration files. Humans retain their original specialties. WS1/WS2/WS3/WS4 IDs occupy separate 01-99 ranges and directories; do not renumber or create tasks in another stream. First claim: WS1-01, WS2-01, WS3-01; WS4-01 becomes ready once those stubs are done. WS0-01 runs independently and must never depend on those stubs.
 
 ## Exact task format
 
@@ -41,7 +41,7 @@ This is an illustrative template, not another registered task. Fields:
 - title: nonempty string (quote strings containing punctuation if needed).
 - workstream: WS0, WS1, WS2, WS3 or WS4.
 - status: todo, claimed, in_progress, blocked, review, done or cut.
-- owner: null, claude-1, claude-2, codex or gemini. A human gate uses null; human signatures belong in Log, not an invented owner enum.
+- owner: null, claude-1, claude-2, claude-3 or gemini. A human gate uses null; human signatures belong in Log, not an invented owner enum.
 - priority: P0, P1 or P2. Every feature stream includes a P0 demo-path task.
 - depends_on: required list of task IDs, even `[]`; dependency direction is prerequisite -> this task.
 - blocks: required list of task IDs, even `[]`; reciprocal reverse index of depends_on, not a second independent graph.
@@ -56,7 +56,7 @@ Limited parser: simple scalar `key: value`, JSON-style bracket lists with bare o
 1. Start with a clean personal clone on main (`git switch main`; `git pull --rebase origin main`). Never pull/rebase over someone else's dirty files. Read channel and your inbox after every pull and before every claim. Run `python tasks/board.py --ready WS1` (substitute stream).
 2. Take only one ready task. Edit only its front matter to claimed, set owner and current claimed_at/updated_at; add a dated claim Log. Explicitly stage that task file only. Commit `[WS1-01] chore: claim task (claude-1)` and push immediately. Do not implement before your claim push is accepted.
 3. If push is rejected, pull --rebase, re-read task/channel/inbox and recheck readiness. A conflicting accepted claim wins; abandon your unpushed claim edits without discarding other work, choose another ready task. Never force-push or override a winner. If both versions claim the same task, keep the already-remote claim.
-4. Change to in_progress and make small scoped commits, e.g. `[WS2-03] feat: compare object hashes (gemini)`. Owner is the actual executor, not the example codex. Stage named files only; never `git add .`. Edit only files listed on the task. Request shared-file/dependency changes through the appropriate inbox rather than editing another stream's files.
+4. Change to in_progress and make small scoped commits, e.g. `[WS2-03] feat: compare object hashes (gemini)` or `[WS3-01] feat: add offline stubs (claude-3)`. Owner is the actual executor. Stage named files only; never `git add .`. Edit only files listed on the task. Request shared-file/dependency changes through the appropriate inbox rather than editing another stream's files.
 5. Rebase before pushes; rerun affected acceptance and `python tasks/board.py --check`. Feature workers do not regenerate BOARD.md for each claim (shared hotspot); live --ready reads task files. WS4/verifier owns periodic `python tasks/board.py` regeneration. --check validates task structure/graph, not snapshot freshness.
 6. Claims with no updated_at/Log progress for 45 minutes may be reclaimed only after a channel notice and checking remote history. Record old/new owner and reason in Log; commit/push claim through the same race protocol. Do not reclaim an active recent task by timestamp alone.
 7. If blocked: set blocked, update timestamp, append reason and demo-safe fallback to Log, message the relevant inbox, commit/push, release your active claim and take another ready task. No secret values in requests; humans arrange credentials/access privately. Blocked dependencies are not ready.
