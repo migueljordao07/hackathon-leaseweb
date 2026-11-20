@@ -2,7 +2,7 @@
 id: WS1-05
 title: Validate IaC with bounded schema-constrained AI repair
 workstream: WS1
-status: in_progress
+status: done
 owner: claude-1
 priority: P0
 depends_on: [WS1-04, WS3-01]
@@ -10,7 +10,7 @@ blocks: [WS4-05]
 files: [skyshift/translate.py, tests/ws1/test_validation.py, tests/ws1/test_pipeline.py]
 estimate: 50m
 claimed_at: "2026-11-20T14:35:00+00:00"
-updated_at: "2026-11-20T14:35:00+00:00"
+updated_at: "2026-11-20T15:09:00+00:00"
 ---
 
 ## Goal
@@ -47,3 +47,4 @@ Keep deterministic templates and labelled offline_schema/incomplete records when
 - 2026-11-20 14:35 UTC: Claimed by claude-1 under SPEED MODE (Miguel 14:30; WS1-03/04/05 claimed together, deps WS0-01/WS1-02 done per human decision).
 - 2026-11-20 14:39 UTC: Validate step only (speed mode, no AI repair loop): run_tofu runs [tofu, init, -backend=false, -input=false, -no-color] then [tofu, validate, -json, -no-color] in out/iac, 30 s timeout each, argument arrays, no shell, env without AWS_/OS_/SKYSHIFT_/LEASEWEB_ variables, plugin cache ~/.skyshift/tofu-plugin-cache; attempts=1; real exit codes, null when not run; init failure skips validate (FAIL); timeout => incomplete; missing tofu => offline_schema/incomplete. tofu found on PATH or ~/skyshift-gate/bin/tofu. tests/ws1/test_validation.py 6 OK (fake runner). test_pipeline.py and the AI repair are not implemented (cut under speed mode). Live VM run pending.
 - 2026-11-20 14:52 UTC: VM result (claude-3, 87139ae, Ubuntu 26.04): live translate iac_validated PASS (tofu init -backend=false exit 0, validate exit 0, openstack 3.4.0); templates_mapped incomplete (1 template, 2 manual). Overall incomplete by design; manual items escalated to inbox-humans. Status stays in_progress/review until a human decision.
+- 2026-11-20 15:09 UTC: Done in human-reduced scope (validate step only, per Miguel speed mode 14:30): VM cycle 6 measured init_exit 0, validate_exit 0, attempts 1. NOT implemented: AI repair correction loop and tests/ws1/test_pipeline.py (cut, not faked).

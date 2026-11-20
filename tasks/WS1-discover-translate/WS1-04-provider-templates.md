@@ -2,7 +2,7 @@
 id: WS1-04
 title: Render known AWS resources into approved provider templates
 workstream: WS1
-status: in_progress
+status: done
 owner: claude-1
 priority: P0
 depends_on: [WS1-03, WS0-01]
@@ -10,7 +10,7 @@ blocks: [WS1-05]
 files: [skyshift/translate.py, skyshift/catalogue/resources.yaml, skyshift/templates/iac/compute.tf.j2, skyshift/templates/iac/network.tf.j2, skyshift/templates/iac/storage.tf.j2, skyshift/templates/iac/provider.tf.j2, skyshift/templates/iac/provider-schema.json, tests/ws1/test_templates.py]
 estimate: 50m
 claimed_at: "2026-11-20T14:35:00+00:00"
-updated_at: "2026-11-20T14:35:00+00:00"
+updated_at: "2026-11-20T15:09:00+00:00"
 ---
 
 ## Goal
@@ -49,3 +49,4 @@ Human-approved offline schema mode is incomplete with null tofu exit codes; reta
 - 2026-11-20 14:39 UTC: Implemented (claude-1). Live translate renders OpenStack templates (provider.tf.j2 terraform-provider-openstack/openstack ~> 3.0; network.tf.j2 secgroup + one rule per rule/CIDR with delete_default_rules=true, never broadened; compute.tf.j2 instance with operator-input image/flavor variables; storage.tf.j2 manual note). Strict {{ }} substitution (no Jinja2 dependency), HCL-escaped literals, only ${var.x} expressions carried over, other references dropped with diagnostics. Fixture result: aws_security_group.app mapped; aws_instance.app manual (AMI->image and t3.micro->flavor unverified); aws_s3_bucket.demo manual (Leaseweb Object Storage bucket pre-provisioned outside OpenTofu). provider-schema.json records openstack 3.4.0 provenance. Local Windows/Py3.14: tests/ws1 62 OK (1 skipped), full tests 196 OK. tofu absent locally: VM init/validate requested from claude-3. Correction: earlier WS1-03 Log/channel times "14:47/14:48" were written ahead of the real clock; the actual push was ~14:37 UTC.
 - 2026-11-20 14:52 UTC: VM result (claude-3, 87139ae, Ubuntu 26.04): live translate iac_validated PASS (tofu init -backend=false exit 0, validate exit 0, openstack 3.4.0); templates_mapped incomplete (1 template, 2 manual). Overall incomplete by design; manual items escalated to inbox-humans. Status stays in_progress/review until a human decision.
 - 2026-11-20 15:07 UTC: Human decisions (Miguel 15:07) implemented: aws_instance.app -> method template, image "Ubuntu 24.04", flavor lsw.c7a.medium (label: smallest available Leaseweb flavor (1 vCPU / 2 GB), not an exact t3.micro equivalent (2 vCPU / 1 GiB)), region eu-west-3-az1, sources = claude-3 inbox-WS1 15:05 (openstack image/flavor list 15:04:15-17, authenticated tofu plan 15:04:26, no apply) stored in provider-schema.json verified_inputs. aws_s3_bucket.demo -> method adopted_existing, status mapped, label "adopted existing resource, not managed by OpenTofu", condition: valid only with migrate+parity PASS on the same bucket in the same run (to be enforced by WS4 evidence). discover now exposes per-resource variable_defaults. tests/ws1 65 OK, full suite OK (Windows/Py3.14). Awaiting VM cycle.
+- 2026-11-20 15:09 UTC: Done (speed-mode rule). VM live cycle 6 (claude-3, 9902f32, 15:08 UTC): run-all exit 0, 8/8 live PASS; translate templates_mapped PASS (2 template + 1 adopted_existing), tofu init/validate exit 0. Commits e1cff25, beaa420, 6f915df.
