@@ -1381,6 +1381,7 @@ def sever(data_map: dict, target: dict, *, config: dict, max_attempts: int = 2, 
             "retrieved_at": src.get("retrieved_at")}
         for p, src in sorted(ranges.sources.items())
     }
+    _redact_target_events(record, config)
     record["data"]["app_sha256_before"] = runner.hash_before
     record["data"]["app_sha256_after"] = _sha256_file(runner.app_path)
     if record["data"]["app_sha256_after"] != runner.hash_before:
@@ -1407,6 +1408,28 @@ def live_ranges() -> RangeSet:
     azure = RangeSet(entries=[e for e in fixture.entries if e.provider == "azure"],
                      sources={k: v for k, v in fixture.sources.items() if k == "azure"})
     return ranges.merge(azure)
+
+
+def _redact_target_events(record: dict, config: dict) -> None:
+    """Replace approved target/telemetry hosts and their addresses with labels (stage-safe output)."""
+    labels = {}
+    for key, label in (("SKYSHIFT_TARGET_ENDPOINT_URL", "approved-target-s3"), ("AWS_ENDPOINT_URL", "approved-target-s3")):
+        endpoint = _endpoint(config.get(key) or "") if isinstance(config.get(key), str) else None
+        if endpoint:
+            labels[endpoint[0]] = label
+    for attempt in record.get("data", {}).get("attempts", []):
+        for event in attempt.get("events", []):
+            if event.get("host") in labels:
+                event["host"] = labels[event["host"]]
+                event["ip"] = None
+            elif event.get("decision") == "allow" and event.get("ip"):
+                try:
+                    if not ipaddress.ip_address(event["ip"]).is_loopback:
+                        event["ip"] = None
+                except ValueError:
+                    event["ip"] = None
+        for bypass in attempt.get("bypasses", []):
+            bypass["ip"] = "redacted"
 
 
 def _sha256_file(path: Path) -> str | None:
