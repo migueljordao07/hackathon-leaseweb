@@ -7,8 +7,47 @@
   "provenance_url": "https://registry.terraform.io/providers/terraform-provider-openstack/openstack/latest/docs",
   "retrieved": "2026-11-20",
   "resources": {
-    "openstack_networking_secgroup_v2": ["name", "description", "delete_default_rules", "tags"],
-    "openstack_networking_secgroup_rule_v2": ["direction", "ethertype", "protocol", "port_range_min", "port_range_max", "remote_ip_prefix", "security_group_id", "description"],
-    "openstack_compute_instance_v2": ["name", "image_name", "flavor_name", "security_groups", "metadata"]
+    "openstack_networking_secgroup_v2": [
+      "name",
+      "description",
+      "delete_default_rules",
+      "tags"
+    ],
+    "openstack_networking_secgroup_rule_v2": [
+      "direction",
+      "ethertype",
+      "protocol",
+      "port_range_min",
+      "port_range_max",
+      "remote_ip_prefix",
+      "security_group_id",
+      "description"
+    ],
+    "openstack_compute_instance_v2": [
+      "name",
+      "image_name",
+      "flavor_name",
+      "security_groups",
+      "metadata"
+    ],
+    "provider": [
+      "region"
+    ]
+  },
+  "verified_inputs": {
+    "_comment": "Human decision (Miguel, 2026-11-20 15:07 UTC) using values measured by claude-3 with the authenticated Leaseweb API; see tasks/comms/inbox-WS1.md 15:05 entry.",
+    "region": "eu-west-3-az1",
+    "default_image": {
+      "name": "Ubuntu 24.04",
+      "applies_to": "any source AMI (the fixture AMI is a synthetic placeholder)",
+      "source": "`openstack image list` on the demo VM at 2026-11-20 15:04:17 UTC (claude-3, tasks/comms/inbox-WS1.md 15:05); resolved by authenticated `tofu plan` data source at 15:04:26 UTC, no apply"
+    },
+    "instance_types": {
+      "t3.micro": {
+        "flavor": "lsw.c7a.medium",
+        "label": "smallest available Leaseweb flavor (1 vCPU / 2 GB), not an exact t3.micro equivalent (2 vCPU / 1 GiB)",
+        "source": "`openstack flavor list --sort-column RAM` on the demo VM at 2026-11-20 15:04:15 UTC (claude-3, tasks/comms/inbox-WS1.md 15:05); resolved by authenticated `tofu plan` data source at 15:04:26 UTC, no apply"
+      }
+    }
   }
 }

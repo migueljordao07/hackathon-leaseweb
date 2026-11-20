@@ -381,6 +381,9 @@ def parse_hcl(workload: Path, catalogue: dict, workload_display: str) -> tuple[l
                         "references": refs,
                         "attributes": attrs,
                         "unresolved": len(unresolved),
+                        "variable_defaults": {
+                            n: var_defaults[n] for expr in unresolved
+                            for n in VAR_ONLY.findall(expr) if n in var_defaults},
                     }
                     resources.append(record)
                     if region is None:

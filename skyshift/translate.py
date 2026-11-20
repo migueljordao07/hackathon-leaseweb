@@ -169,6 +169,27 @@ PLACEHOLDER = re.compile(r"\{\{\s*([a-z_]+)\s*\}\}")
 SECRET_ENV_PREFIXES = ("AWS_", "OS_", "SKYSHIFT_", "LEASEWEB_")
 
 
+ADOPTED_LABEL = "adopted existing resource, not managed by OpenTofu"
+SCHEMA_PATH = TEMPLATE_DIR / "provider-schema.json"
+
+
+def verified_inputs() -> dict:
+    """Human-approved measured compute inputs (image/flavor/region) with sources."""
+    try:
+        return json.loads(SCHEMA_PATH.read_text(encoding="utf-8")).get("verified_inputs") or {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _resolve_literal(value, resource: dict):
+    """Literal value, or the workload's literal default for an exact ``${var.x}``."""
+    if isinstance(value, dict) and value.get("unresolved"):
+        m = VAR_REF.fullmatch(_strip_quotes(str(value.get("expression", ""))))
+        defaults = resource.get("variable_defaults") or {}
+        return defaults.get(m.group(1)) if m else None
+    return value
+
+
 class Unresolvable(Exception):
     """An attribute expression that cannot be translated safely."""
 
@@ -356,30 +377,61 @@ def _render_resources(resources: list[dict], storage_mode: str | None) -> tuple[
                         sgs.append(f"openstack_networking_secgroup_v2.{labels[ref]}.name")
                     elif by_id.get(ref, {}).get("type") == "aws_security_group":
                         dropped.append(f"security group {ref} not translated")
-                image_var, flavor_var = f"{label}_image_name", f"{label}_flavor_name"
                 ami = attrs.get("ami")
-                itype = attrs.get("instance_type")
-                extra_vars[image_var] = "Leaseweb image name replacing the source AMI (operator input)"
-                extra_vars[flavor_var] = "Leaseweb flavor replacing the source instance type (operator input)"
+                itype = _resolve_literal(attrs.get("instance_type"), r)
+                inputs = verified_inputs()
+                flavor = (inputs.get("instance_types") or {}).get(itype) if isinstance(itype, str) else None
+                image = inputs.get("default_image")
                 name = hcl_value(attrs["tags"]["Name"], used_vars) if isinstance(
                     attrs.get("tags"), dict) and "Name" in attrs["tags"] else hcl_literal(label)
+                if flavor and image:
+                    image_hcl, flavor_hcl = hcl_literal(image["name"]), hcl_literal(flavor["flavor"])
+                    note = "template; human-approved measured image/flavor"
+                else:
+                    image_var, flavor_var = f"{label}_image_name", f"{label}_flavor_name"
+                    extra_vars[image_var] = "Leaseweb image name replacing the source AMI (operator input)"
+                    extra_vars[flavor_var] = "Leaseweb flavor replacing the source instance type (operator input)"
+                    image_hcl, flavor_hcl = "var." + image_var, "var." + flavor_var
+                    note = "manual; image/flavor need operator input"
                 blocks.append(render_template("compute.tf.j2", {
-                    "source_id": safe_id, "label": label, "name": name, "image_var": image_var,
-                    "flavor_var": flavor_var, "security_groups": "[" + ", ".join(sgs) + "]",
+                    "source_id": safe_id, "label": label, "name": name, "image": image_hcl,
+                    "flavor": flavor_hcl, "method_note": note,
+                    "security_groups": "[" + ", ".join(sgs) + "]",
                     "metadata": _map_of(attrs.get("tags"), used_vars, dropped, "tags")}))
-                row.update(target_type="openstack_compute_instance_v2",
-                           manual_reason=("rendered with operator inputs: no verified mapping from "
-                                          f"AMI {_describe(ami)} to a Leaseweb image or from "
-                                          f"instance type {_describe(itype)} to a flavor"))
+                row.update(target_type="openstack_compute_instance_v2")
+                if flavor and image:
+                    row.update(method="template", status="mapped",
+                               image={"name": image["name"], "source": image["source"]},
+                               flavor={"name": flavor["flavor"], "source_instance_type": itype,
+                                       "label": flavor["label"], "source": flavor["source"]})
+                else:
+                    row["manual_reason"] = ("rendered with operator inputs: no verified mapping from "
+                                            f"AMI {_describe(ami)} to a Leaseweb image or from "
+                                            f"instance type {_describe(itype)} to a flavor")
             elif rtype == "aws_s3_bucket":
                 target_type = storage_mode or "object_storage_bucket"
                 reason = ("Leaseweb Object Storage bucket is pre-provisioned outside OpenTofu "
                           "(no verified OpenStack-provider resource for it); migrate copies into "
                           "the configured target bucket" if storage_mode == "native_s3" else
                           "separately operated S3 service and bucket must be set up manually")
-                blocks.append(render_template("storage.tf.j2", {
-                    "source_id": safe_id, "target_type": target_type, "reason": reason}))
-                row.update(target_type=target_type, manual_reason=reason)
+                if storage_mode == "native_s3":
+                    reason = ("existing human-provisioned Leaseweb Object Storage bucket "
+                              "(SKYSHIFT_TARGET_BUCKET) adopted; counts as mapped only when "
+                              "migrate and parity measure PASS on this bucket in the same run")
+                    blocks.append(render_template("storage.tf.j2", {
+                        "source_id": safe_id, "target_type": target_type, "reason": reason,
+                        "method_note": ADOPTED_LABEL}))
+                    row.update(target_type=target_type, method="adopted_existing",
+                               status="mapped", label=ADOPTED_LABEL,
+                               condition="requires migrate PASS and parity PASS on the same "
+                                         "target bucket in the same run (human decision "
+                                         "2026-11-20 15:07 UTC)",
+                               decision="tasks/comms/inbox-humans.md (Miguel, 15:07 UTC)")
+                else:
+                    blocks.append(render_template("storage.tf.j2", {
+                        "source_id": safe_id, "target_type": target_type, "reason": reason,
+                        "method_note": "MANUAL"}))
+                    row.update(target_type=target_type, manual_reason=reason)
             else:
                 row["manual_reason"] = f"no template for {rtype}; AI gap-filling not run"
         except Unresolvable as exc:
@@ -489,7 +541,9 @@ def _live_translate(data_map: dict, target: dict, *, output_dir: Path, config: d
     body, rows, diagnostics = _render_resources(data_map["resources"], target.get("storage_mode"))
     main_tf = output_dir / "iac" / "main.tf"
     main_tf.parent.mkdir(parents=True, exist_ok=True)
-    text = render_template("provider.tf.j2", {"workload_note": "the discovered AWS data map"})
+    region = verified_inputs().get("region")
+    text = render_template("provider.tf.j2", {"workload_note": "the discovered AWS data map",
+                                              "region": hcl_literal(region) if region else "null"})
     main_tf.write_text(text + body + "\n", encoding="utf-8", newline="\n")
 
     validation = run_tofu(main_tf.parent, tofu if tofu is not None else find(), runner)
@@ -498,8 +552,10 @@ def _live_translate(data_map: dict, target: dict, *, output_dir: Path, config: d
     manual = [r for r in rows if r["status"] == "manual"]
     checks = [{"id": "templates_mapped",
                "status": "PASS" if rows and not manual else "incomplete",
-               "detail": f"{len(mapped)} mapped by template, {len(manual)} manual of {len(rows)} "
-                         "discovered resource(s)"}]
+               "detail": f"{sum(r['method'] == 'template' for r in mapped)} mapped by template, "
+                         f"{sum(r['method'] == 'adopted_existing' for r in mapped)} adopted existing "
+                         f"(conditional on migrate+parity PASS), {len(manual)} manual of "
+                         f"{len(rows)} discovered resource(s)"}]
     if validation["method"] != "tofu":
         checks.append({"id": "iac_validated", "status": "incomplete",
                        "detail": "offline only: tofu not available, validate not run"})

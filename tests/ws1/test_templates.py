@@ -18,7 +18,8 @@ SG = {"id": "aws_security_group.app", "type": "aws_security_group", "references"
                                  "cidr_blocks": ["192.0.2.0/24"]}],
                      "tags": {"Name": "sg"}}}
 VM = {"id": "aws_instance.app", "type": "aws_instance", "references": ["aws_security_group.app"],
-      "attributes": {"ami": U("${var.ami_id}"), "instance_type": "t3.micro",
+      "variable_defaults": {"instance_type": "t3.micro"},
+      "attributes": {"ami": U("${var.ami_id}"), "instance_type": U("${var.instance_type}"),
                      "tags": {"Name": U('"${var.project_name}-app"'),
                               "Bucket": U("${aws_s3_bucket.demo.bucket}")}}}
 BUCKET = {"id": "aws_s3_bucket.demo", "type": "aws_s3_bucket", "references": [],
@@ -45,10 +46,31 @@ class TemplateTest(unittest.TestCase):
         self.assertIn("terraform-provider-openstack/openstack", text)
         rows = {r["source_id"]: r for r in rec["data"]["resources"]}
         self.assertEqual(rows["aws_security_group.app"]["status"], "mapped")
-        self.assertEqual(rows["aws_instance.app"]["status"], "manual")  # AMI unresolved
-        self.assertIn("AMI", rows["aws_instance.app"]["manual_reason"])
-        self.assertEqual(rows["aws_s3_bucket.demo"]["status"], "manual")
-        self.assertEqual(rec["status"], "incomplete")
+        inst = rows["aws_instance.app"]
+        self.assertEqual((inst["method"], inst["status"]), ("template", "mapped"))
+        self.assertEqual(inst["flavor"]["name"], "lsw.c7a.medium")
+        self.assertIn("not an exact t3.micro equivalent", inst["flavor"]["label"])
+        self.assertIn("15:04", inst["flavor"]["source"])
+        self.assertIn('image_name      = "Ubuntu 24.04"', text)
+        self.assertIn('region = "eu-west-3-az1"', text)
+        bucket = rows["aws_s3_bucket.demo"]
+        self.assertEqual((bucket["method"], bucket["status"]), ("adopted_existing", "mapped"))
+        self.assertEqual(bucket["label"], "adopted existing resource, not managed by OpenTofu")
+        self.assertIn("migrate", bucket["condition"])
+        self.assertEqual(rec["status"], "incomplete")  # tofu not run here
+
+    def test_unknown_instance_type_stays_manual(self):
+        vm = json.loads(json.dumps(VM))
+        vm["variable_defaults"] = {"instance_type": "x9.huge"}
+        rec, out = translate(dict(DATA_MAP, resources=[SG, vm]))
+        row = [r for r in rec["data"]["resources"] if r["source_id"] == "aws_instance.app"][0]
+        self.assertEqual(row["status"], "manual")
+        self.assertIn("AMI", row["manual_reason"])
+
+    def test_selfhosted_bucket_stays_manual(self):
+        rec, _ = translate(target=dict(TARGET, storage_mode="self_hosted_s3"))
+        row = [r for r in rec["data"]["resources"] if r["source_id"] == "aws_s3_bucket.demo"][0]
+        self.assertEqual(row["status"], "manual")
         self.assertEqual([r["source_id"] for r in rec["data"]["resources"]],
                          [r["id"] for r in DATA_MAP["resources"]])
 

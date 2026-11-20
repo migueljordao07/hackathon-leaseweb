@@ -42,7 +42,8 @@ class ValidationTest(unittest.TestCase):
                          ("tofu", 0, 0, 1))
         checks = {c["id"]: c["status"] for c in rec["checks"]}
         self.assertEqual(checks["iac_validated"], "PASS")
-        self.assertEqual(rec["status"], "incomplete")  # manual rows remain
+        self.assertEqual(checks["templates_mapped"], "PASS")
+        self.assertEqual(rec["status"], "PASS")
 
     def test_init_failure_skips_validate(self):
         runner = FakeRunner((1, "", "registry unreachable"))

@@ -1,9 +1,9 @@
 
-# {{ source_id }} -> openstack_compute_instance_v2 (template; image/flavor need operator input)
+# {{ source_id }} -> openstack_compute_instance_v2 ({{ method_note }})
 resource "openstack_compute_instance_v2" "{{ label }}" {
   name            = {{ name }}
-  image_name      = var.{{ image_var }}
-  flavor_name     = var.{{ flavor_var }}
+  image_name      = {{ image }}
+  flavor_name     = {{ flavor }}
   security_groups = {{ security_groups }}
   metadata        = {{ metadata }}
 }
