@@ -33,6 +33,7 @@ On Windows, Python 3.11.16, during the planning review on 2026-11-20:
 - `python -B tasks/board.py --check`: schema, graph and ownership valid.
 - `python -B tasks/board.py --ready WS0` through WS4: WS0-01 human-only; WS1-01, WS2-01 and WS3-01 ready; no WS4 task ready initially.
 - `python -B tasks/summarize.py`: computed counts, per-stream task-minutes and weighted DAG longest path below.
+- `python -B tasks/verify_committed.py`: passed in an isolated archive of committed tasks/ without the untracked proposal; repeated all 19 tests, --check, five --ready modes and summary. All 26 task files have exact ordered body sections; communication files, local Markdown links and generated board snapshot match. This is a Windows archive check, not supplied-VM or product acceptance.
 - Git status inspected before edits/staging; staged diff checked before commits; only named planning files are eligible. Pre-existing research edits and the untracked local proposal are not framework deliverables and must stay unstaged.
 
 These checks validate the planning utility and documents, not product functionality or Linux/VM behavior. Product acceptance commands in task files are future commands; they were not executed during planning.
