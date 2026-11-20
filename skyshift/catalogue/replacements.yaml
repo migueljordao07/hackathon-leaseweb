@@ -1,14 +1,22 @@
 {
-  "_comment": "Replacement catalogue (WS3). Written in the JSON subset of YAML so the standard-library json module parses it; no PyYAML dependency. Remediation is configuration-only: the application code is never modified.",
+  "_comment": "Replacement catalogue (WS3). Written in the JSON subset of YAML so the standard-library json module parses it; no PyYAML dependency. Remediation is configuration-only: the application code is never modified. Entries are deterministic; a model may explain a choice but never selects outside this list.",
   "schema_version": 1,
   "replacements": [
     {
       "id": "local-otel",
-      "matches": {"service": "telemetry", "providers": ["aws"], "hosts": ["monitoring.amazonaws.com"]},
-      "description": "Route application telemetry to a local OpenTelemetry-compatible receiver on the target VM instead of a US-controlled monitoring endpoint.",
-      "config": {"SKYSHIFT_TELEMETRY_ENDPOINT": "http://127.0.0.1:4318"},
+      "matches": {
+        "service": "telemetry",
+        "providers": ["aws"],
+        "hosts": ["monitoring.amazonaws.com", "monitoring.*.amazonaws.com"]
+      },
+      "description": "Route application telemetry to SkyShift's bounded loopback demo receiver on the target VM instead of a US-controlled monitoring endpoint. This is a local demo replacement that accepts HTTP POST telemetry and counts receipts; it is not a deployed OpenTelemetry collector.",
+      "protocol": "http-post",
+      "config": {"SKYSHIFT_TELEMETRY_ENDPOINT": "http://127.0.0.1:{port}"},
+      "default_port": 4318,
+      "allowed_config_keys": ["SKYSHIFT_TELEMETRY_ENDPOINT"],
       "applied_config_keys": ["SKYSHIFT_TELEMETRY_ENDPOINT"],
-      "code_change": false
+      "code_change": false,
+      "provenance": "synthetic demo entry; availability tested only as a loopback receiver in offline tests, not as a production service"
     }
   ]
 }

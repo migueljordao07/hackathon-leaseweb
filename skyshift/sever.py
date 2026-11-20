@@ -992,6 +992,335 @@ def _stub_record(data_map: dict, max_attempts: int) -> dict:
     return _envelope("stub", "incomplete", checks, data, errors)
 
 
+# ---------------------------------------------------------------------------
+# Replacement catalogue, demo telemetry receiver and bounded retry loop (WS3-05)
+# ---------------------------------------------------------------------------
+
+MAX_ATTEMPTS_LIMIT = 5
+RECEIVER_MAX_BODY = 1024 * 1024
+RADAR_SAMPLE_INTERVAL = 0.2
+
+
+def load_catalogue(path: Path = REPLACEMENTS_PATH) -> list[dict]:
+    """Return validated replacement entries; malformed entries are skipped."""
+    try:
+        with Path(path).open("r", encoding="utf-8") as handle:
+            doc = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return []
+    entries = []
+    for entry in doc.get("replacements", []) if isinstance(doc, dict) else []:
+        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+            continue
+        config = entry.get("config")
+        allowed = entry.get("allowed_config_keys")
+        if not isinstance(config, dict) or not isinstance(allowed, list) or not set(config) <= set(allowed):
+            continue
+        if entry.get("code_change") is not False:
+            continue
+        entries.append(entry)
+    return entries
+
+
+def select_replacement(host: str, catalogue: list[dict]) -> dict | None:
+    """Deterministically pick the first catalogue entry whose host pattern matches."""
+    from fnmatch import fnmatchcase
+
+    host = (host or "").lower()
+    for entry in catalogue:
+        for pattern in entry.get("matches", {}).get("hosts", []):
+            if isinstance(pattern, str) and fnmatchcase(host, pattern.lower()):
+                return entry
+    return None
+
+
+class TelemetryReceiver:
+    """Bounded loopback HTTP POST receiver used as the local demo telemetry replacement.
+
+    Counts receipts (path and byte count only; bodies are discarded). Not an
+    OpenTelemetry collector and not exposed beyond 127.0.0.1.
+    """
+
+    def __init__(self, port: int = 0):
+        self.port = port
+        self._server = None
+        self._thread = None
+        self._receipts: list[dict] = []
+
+    def start(self) -> "TelemetryReceiver":
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        receipts = self._receipts
+
+        class Handler(BaseHTTPRequestHandler):
+            timeout = PROXY_IO_TIMEOUT
+
+            def do_POST(self):  # noqa: N802 - http.server API
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                except ValueError:
+                    length = -1
+                if not 0 <= length <= RECEIVER_MAX_BODY:
+                    self.send_error(413)
+                    return
+                self.rfile.read(length)
+                receipts.append({"path": self.path.split("?", 1)[0], "bytes": length})
+                body = b"{}"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):  # keep stdout clean
+                return
+
+        self._server = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        self._server.daemon_threads = True
+        self.port = self._server.server_address[1]
+        self._thread = threading.Thread(target=self._server.serve_forever, kwargs={"poll_interval": 0.1},
+                                        name="skyshift-telemetry-receiver", daemon=True)
+        self._thread.start()
+        return self
+
+    def stop(self) -> None:
+        if self._server is not None:
+            self._server.shutdown()
+            self._server.server_close()
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+
+    def __enter__(self) -> "TelemetryReceiver":
+        return self.start()
+
+    def __exit__(self, *_exc) -> None:
+        self.stop()
+
+    @property
+    def endpoint(self) -> str:
+        return f"http://127.0.0.1:{self.port}"
+
+    @property
+    def receipts(self) -> list[dict]:
+        return list(self._receipts)
+
+
+def _proposal_schema(entry: dict, catalogue: list[dict]) -> dict:
+    return {
+        "type": "object",
+        "required": ["replacement_id", "rationale", "config_keys"],
+        "properties": {
+            "replacement_id": {"type": "string", "enum": [e["id"] for e in catalogue]},
+            "rationale": {"type": "string", "minLength": 1, "maxLength": 2000},
+            "config_keys": {"type": "array", "minItems": 1, "maxItems": 10,
+                            "items": {"type": "string", "enum": list(entry["allowed_config_keys"])}},
+        },
+    }
+
+
+def _propose(entry: dict, blocked_hosts: list[str], catalogue: list[dict], proposer, config: dict) -> dict:
+    """Ask the single LLM client for an explanation; deterministic choice stays authoritative."""
+    record = {"id": entry["id"], "mode": "deterministic", "applied_config_keys": list(entry["config"]),
+              "proposal_status": "not_requested", "explanation": None}
+    if proposer is None:
+        return record
+    payload = {"blocked_hosts": sorted(set(blocked_hosts))[:10], "candidates": [e["id"] for e in catalogue]}
+    try:
+        result = proposer("replacement_proposal", payload, _proposal_schema(entry, catalogue), config=config)
+    except Exception as exc:  # noqa: BLE001 - proposals are advisory
+        record["proposal_status"] = f"incomplete ({type(exc).__name__})"
+        return record
+    data = result.get("data") if isinstance(result, dict) else None
+    record["mode"] = result.get("mode", "replay") if isinstance(result, dict) else "replay"
+    if not isinstance(data, dict) or not data:
+        record["proposal_status"] = "incomplete"
+        return record
+    agrees = data.get("replacement_id") == entry["id"] and set(data.get("config_keys", [])) <= set(entry["allowed_config_keys"])
+    record["proposal_status"] = "agrees" if agrees else "disagrees (deterministic selection kept)"
+    record["explanation"] = str(data.get("rationale", ""))[:500] if agrees else None
+    return record
+
+
+class _RadarSampler:
+    """Collect radar snapshots in the background while the app runs (bounded)."""
+
+    def __init__(self, reader):
+        import threading
+
+        self.reader = reader or _default_radar_reader
+        self.samples: list[tuple] = []
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True, name="skyshift-radar")
+
+    def _take(self):
+        if len(self.samples) >= RADAR_MAX_SAMPLES:
+            return
+        try:
+            self.samples.append(self.reader())
+        except Exception as exc:  # noqa: BLE001
+            self.samples.append(([], [f"reader failed: {type(exc).__name__}"]))
+
+    def _run(self):
+        while not self._stop.is_set():
+            self._take()
+            self._stop.wait(RADAR_SAMPLE_INTERVAL)
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, *_exc):
+        self._stop.set()
+        self._thread.join(timeout=2.0)
+        self._take()
+
+    def result(self, proxy_events: list[dict]) -> dict:
+        samples = self.samples[:RADAR_MAX_SAMPLES] or [([], ["no radar sample collected"])]
+        replay = iter(samples)
+        return radar_scan(proxy_events=proxy_events, reader=lambda: next(replay), samples=len(samples))
+
+
+def _run_attempt(number: int, attempt_config: dict, replacement: dict | None, *, app_runner, ranges,
+                 resolver, connector, clock, radar_reader, receiver_port: int | None) -> tuple[dict, dict]:
+    """One bounded attempt: proxy + optional receiver + radar around a single app run."""
+    receiver = TelemetryReceiver(receiver_port).start() if receiver_port is not None else None
+    try:
+        config = dict(attempt_config)
+        if receiver is not None:
+            config["SKYSHIFT_TELEMETRY_ENDPOINT"] = receiver.endpoint
+        allowlist = allowlist_from_config(config)
+        with EgressProxy(allowlist=allowlist, ranges=ranges, resolver=resolver,
+                         connector=connector, clock=clock) as proxy:
+            env = {**config, "HTTPS_PROXY": proxy.url, "HTTP_PROXY": proxy.url, "NO_PROXY": ""}
+            with _RadarSampler(radar_reader) as sampler:
+                try:
+                    app = app_runner(env)
+                    app_ok = app.get("ok") if isinstance(app, dict) else None
+                    app_detail = str(app.get("detail", ""))[:300] if isinstance(app, dict) else "invalid runner result"
+                except Exception as exc:  # noqa: BLE001 - runner failure is evidence, not a crash
+                    app_ok, app_detail = None, f"app runner failed: {type(exc).__name__}"
+            events = proxy.events
+        radar = sampler.result(events)
+        receipts = receiver.receipts if receiver is not None else []
+    finally:
+        if receiver is not None:
+            receiver.stop()
+
+    denied = [e for e in events if e["decision"] == "deny"]
+    reasons = []
+    if denied:
+        reasons.append(f"{len(denied)} destination(s) denied by proxy")
+    if radar["bypasses"]:
+        reasons.append(f"{len(radar['bypasses'])} radar bypass candidate(s)")
+    if app_ok is False:
+        reasons.append("app functional check failed")
+    if receiver is not None and not receipts:
+        reasons.append("replacement receiver got no telemetry")
+    if reasons:
+        status = "FAIL"
+    elif app_ok is None or radar["coverage"] == "unavailable":
+        status = "incomplete"
+    else:
+        status = "PASS"
+    attempt = {
+        "number": number,
+        "events": events,
+        "blocked": len(denied),
+        "bypasses": radar["bypasses"],
+        "replacement": replacement,
+        "status": status,
+        "app": {"ok": app_ok, "detail": app_detail},
+        "receiver_receipts": len(receipts),
+        "radar_coverage": radar["coverage"],
+        "notes": reasons,
+    }
+    return attempt, radar
+
+
+def run_severance(data_map: dict, target: dict, *, config: dict, app_runner: Callable[[dict], dict],
+                  max_attempts: int = 2, ranges: RangeSet | None = None, resolver=None, connector=None,
+                  clock=None, radar_reader=None, proposer=None, catalogue: list[dict] | None = None,
+                  receiver_port: int = 0) -> dict:
+    """Bounded red -> config-only fix -> retry loop. Deterministic code owns every check.
+
+    ``app_runner(env) -> {"ok": bool|None, "detail": str}`` runs the unchanged
+    app once with the given environment (WS2 ``run_app`` at WS3-07; injected in
+    tests). Every attempt is preserved; the first denial is never erased.
+    """
+    _validate_inputs(data_map, target, config, max_attempts)
+    if max_attempts > MAX_ATTEMPTS_LIMIT:
+        raise ValueError(f"max_attempts must be at most {MAX_ATTEMPTS_LIMIT}")
+    if not callable(app_runner):
+        raise ValueError("app_runner must be callable")
+    ranges = ranges if ranges is not None else load_ranges()
+    catalogue = load_catalogue() if catalogue is None else catalogue
+    allowed_keys = {k for e in catalogue for k in e["allowed_config_keys"]}
+
+    attempt_config = {k: v for k, v in config.items() if isinstance(v, str)}
+    replacement, use_receiver = None, False
+    attempts, manual, radars = [], [], []
+    for number in range(1, max_attempts + 1):
+        attempt, radar = _run_attempt(number, attempt_config, replacement, app_runner=app_runner, ranges=ranges,
+                                      resolver=resolver, connector=connector, clock=clock,
+                                      radar_reader=radar_reader,
+                                      receiver_port=receiver_port if use_receiver else None)
+        attempts.append(attempt)
+        radars.append(radar)
+        if attempt["status"] != "FAIL":
+            break
+        denied_hosts = [e["host"] for e in attempt["events"] if e["decision"] == "deny"]
+        if not denied_hosts or attempt["bypasses"]:
+            break  # nothing a proxy-side config-only replacement can fix
+        matches = {h: select_replacement(h, catalogue) for h in denied_hosts}
+        entry = next((m for m in matches.values() if m is not None), None)
+        for host in sorted(h for h, m in matches.items() if m is None):
+            note = f"no catalogued replacement for {host}; manual remediation required"
+            if note not in manual:
+                manual.append(note)
+        unknown = [h for h, m in matches.items() if m is None]
+        if entry is None or unknown or (replacement is not None and replacement["id"] == entry["id"]):
+            break  # unknown dependency or the same fix already failed
+        if number == max_attempts:
+            manual.append(f"replacement {entry['id']} available but attempts exhausted")
+            break
+        if not set(entry["config"]) <= allowed_keys:
+            manual.append(f"replacement {entry['id']} uses keys outside the catalogue allowlist")
+            break
+        replacement = _propose(entry, denied_hosts, catalogue, proposer, config)
+        use_receiver = entry.get("protocol") == "http-post" and "SKYSHIFT_TELEMETRY_ENDPOINT" in entry["config"]
+        if not use_receiver:
+            manual.append(f"replacement {entry['id']} protocol {entry.get('protocol')!r} has no local demo receiver")
+            break
+
+    last = attempts[-1]
+    final = {"PASS": "green", "FAIL": "blocked"}.get(last["status"], "incomplete")
+    cloud_denials = [e for a in attempts for e in a["events"]
+                     if e["decision"] == "deny" and e["reason"].startswith("published cloud range")]
+    last_radar = radars[-1]
+    checks = [
+        {"id": "proxy_denies_cloud_egress",
+         "status": "PASS" if cloud_denials else "incomplete",
+         "detail": (f"{len(cloud_denials)} cloud-range request(s) denied and logged" if cloud_denials
+                    else "no cloud-range destination was attempted; denial not demonstrated") + ". " + PROXY_SCOPE},
+        {"id": "radar_bypass_detection",
+         "status": {"unavailable": "incomplete"}.get(last_radar["coverage"], "FAIL" if last_radar["bypasses"] else "PASS"),
+         "detail": f"final attempt: {len(last_radar['bypasses'])} bypass candidate(s), coverage "
+                   f"{last_radar['coverage']}; detection only, never enforcement"},
+        {"id": "config_only_replacement_retry",
+         "status": {"green": "PASS", "blocked": "FAIL"}.get(final, "incomplete"),
+         "detail": f"final {final} after {len(attempts)} of {max_attempts} attempt(s); app code unchanged, "
+                   "config-only remediation; earlier attempts preserved"},
+    ]
+    statuses = {c["status"] for c in checks}
+    status = "FAIL" if "FAIL" in statuses else ("PASS" if statuses == {"PASS"} else "incomplete")
+    data = {"attempts": attempts, "max_attempts": max_attempts, "final": final, "radar_scope": RADAR_SCOPE,
+            "manual": manual, "radar_limitations": list(RADAR_LIMITATIONS),
+            "runner": getattr(app_runner, "label", getattr(app_runner, "__name__", "app_runner"))}
+    errors = sorted({e for r in radars for e in r["collection_errors"]})
+    return _envelope("live", status, checks, data, errors)
+
+
 def sever(data_map: dict, target: dict, *, config: dict, max_attempts: int = 2, stub: bool = False) -> dict:
     """Return the severance envelope.
 
@@ -1018,7 +1347,8 @@ def sever(data_map: dict, target: dict, *, config: dict, max_attempts: int = 2, 
         {
             "id": "config_only_replacement_retry",
             "status": "incomplete",
-            "detail": "not implemented (WS3-05); no retry attempted",
+            "detail": "run_severance exists (WS3-05) but sever() has no app runner until WS2 run_app is wired "
+            "at WS3-07; no retry attempted",
         },
     ]
     data = {"attempts": [], "max_attempts": max_attempts, "final": "incomplete", "radar_scope": RADAR_SCOPE}
