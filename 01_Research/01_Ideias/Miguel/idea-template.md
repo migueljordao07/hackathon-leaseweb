@@ -5,7 +5,7 @@
 **Proposed by:** [Name] · **Status:** [Exploring / Shortlisted / Selected / Parked]
 **Theme:** [AI-assisted operations / Security & data protection / Migration & sovereignty]
 
-Duplicate this file as `NN-short-idea-name.md`. Spend 5-10 minutes on the first pass; use short bullets and mark unknowns explicitly. Use the [team briefing](../01_Research/ai-cloud-infrastructure-team-briefing.md) for context.
+Duplicate this file as `NN-short-idea-name.md`. Spend 5-10 minutes on the first pass; use short bullets and mark unknowns explicitly. Use the [team briefing](../../ai-cloud-infrastructure-team-briefing.md) for context.
 
 ## 1. Problem and user
 
@@ -67,7 +67,7 @@ Keep credentials out of this file. Confirm API access separately from chat subsc
 
 ## 7. Team decision
 
-Use the [official criteria](../00_Context/challenge-and-guidelines.md). Scores are provisional discussion aids, not jury predictions; score each from 1 to 5 with equal weight.
+Use the [official criteria](../../../00_Context/challenge-and-guidelines.md). Scores are provisional discussion aids, not jury predictions; score each from 1 to 5 with equal weight.
 
 | Criterion | Score | Reason |
 |---|---|---|
