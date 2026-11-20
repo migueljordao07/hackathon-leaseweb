@@ -2,15 +2,15 @@
 id: WS1-02
 title: Parse AWS dependencies inventory S3 and calculate readiness
 workstream: WS1
-status: todo
-owner: null
+status: claimed
+owner: claude-1
 priority: P0
 depends_on: [WS1-01]
 blocks: [WS1-03]
 files: [skyshift/discover.py, skyshift/catalogue/resources.yaml, tests/ws1/test_discovery.py]
 estimate: 50m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T12:39:39+00:00"
+updated_at: "2026-11-20T12:39:39+00:00"
 ---
 
 ## Goal
@@ -43,3 +43,4 @@ Offline mocked tests and static analysis remain usable without VM access; invent
 
 ## Log
 - 2026-11-20: Planned only. Offline parsing can proceed without the VM gate; real source calls require the human go/access record.
+- 2026-11-20T12:39:39+00:00: Claimed by claude-1 after WS1-01 done (5f7bce8).
