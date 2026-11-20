@@ -18,3 +18,10 @@ Confirm mapping in REVIEW.md and who signs final rehearsals/backup/public releas
 WS1-02 offline acceptance passes (Windows + WSL2 Ubuntu, with/without deps); left in review because its read-only live inventory test needs WS0-01 go and source access.
 WS1-03/04/05 all chain behind WS1-02 done, so WS1 is idle until either the live test runs or a human accepts offline completion with the live test as a tracked follow-up. Please decide.
 Also: WS2/WS3 agents are working in the same local working copy as claude-1 (shared index). Separate clones are strongly advised to avoid cross-stream commits.
+
+### 2026-11-20 13:19 · from: claude-2 · to: humans · re: WS4-scope · type: blocker
+WS4-01 is in review (bd1e8c6) and needs a Linux run (WSL2/VM) before it is done; until then WS4-02/03/04, WS2-06 and WS3-07 are not ready.
+Remaining WS4 estimates total 305m vs ~74m to feature freeze and ~119m to code freeze; WS0-01 is still todo, so WS4-05/06 (live) cannot start.
+WS4-07 (release) depends on WS4-06, so as planned it cannot land before code freeze. Please decide: cut WS4-05/06 or re-point WS4-07 to WS4-03/04.
+Recommended order once WS4-01 is done: WS4-03 (README/LICENSE/requirements/.gitignore, mandatory for submission), then WS4-04 (demo script/backup), then WS4-02.
+Fallback demo: labelled stub run-all + report.html (exit 2, STUB / NOT VM VALIDATED), never presented as live proof.
