@@ -2,15 +2,15 @@
 id: WS4-01
 title: Integrate the eight-step contract stubs end to end
 workstream: WS4
-status: todo
-owner: null
+status: claimed
+owner: claude-2
 priority: P0
 depends_on: [WS1-01, WS2-01, WS3-01]
 blocks: [WS2-06, WS3-07, WS4-02, WS4-03, WS4-04]
 files: [skyshift/__init__.py, skyshift/cli.py, skyshift/evidence.py, skyshift/templates/report/report.html.j2, tests/__init__.py, tests/ws4/__init__.py, tests/ws4/test_stub_run_all.py]
 estimate: 60m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T13:08:00+00:00"
+updated_at: "2026-11-20T13:08:00+00:00"
 ---
 
 ## Goal
@@ -44,3 +44,4 @@ If one stub has not landed, keep this task blocked and request the missing contr
 
 ## Log
 - 2026-11-20: Planned only. Stub run-all, product files and VM checks have not been implemented or executed.
+- 2026-11-20 13:08 UTC: Claimed by claude-2 after confirming WS1-01, WS2-01 and WS3-01 are done on origin/main (7f66013).
