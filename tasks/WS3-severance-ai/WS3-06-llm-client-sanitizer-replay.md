@@ -1,0 +1,40 @@
+---
+id: WS3-06
+title: Implement one LLM client with local sanitization and cached replay
+workstream: WS3
+status: todo
+owner: null
+priority: P0
+depends_on: [WS3-01]
+blocks: [WS3-07]
+files: [skyshift/llm.py, fixtures/llm/replay.json, tests/ws3/test_llm_client.py]
+estimate: 50m
+claimed_at: null
+updated_at: null
+---
+
+## Goal
+Implement one provider-neutral client path that sanitizes locally before transmission and supports deterministic, visibly labelled cached-response replay.
+
+## Context
+Follow `tasks/contracts.md` headings Python API, Environment names only, and CLI contract and demo honesty: `complete(task, payload, schema, *, config, replay=False)` returns the fixed envelope; only synthetic locally sanitized data may leave the VM; no raw environment, source data, credentials or private addresses; replay is visibly labelled and cannot masquerade as live. Root proposal sections 3, 4, 6, 7, 9 and 10 motivate AI explanations, local sanitization and cache fallback. API availability/latency are unverified, so all tests are offline and do not imply a successful live call.
+
+## Steps
+1. Implement one client/configuration route only; avoid multiple SDK clients or network calls at import time.
+2. Add deterministic local sanitization for known secret-like values, environment key/value material, credentials, signed query strings, and private addresses before any request construction.
+3. Load replay responses from the committed synthetic fixture and label mode `replay`; bound timeouts/retries for a live adapter and return `incomplete` on unavailable credentials or transport failure.
+4. Add tests proving sanitization occurs before transport, replay is deterministic and labelled, and error paths return incomplete without exposing payload secrets.
+
+## Acceptance criteria
+- `python -m unittest tests.ws3.test_llm_client` exits 0 with at least five cases and no external API/network access.
+- A fake transport verifies the request receives only the sanitized synthetic payload; assert known secret markers, private IPs and signed query values are absent.
+- Replay output contains `mode: replay`; unavailable live credentials/transport produce `status: incomplete`, never PASS.
+
+## Out of scope
+Multiple provider clients, model selection policy, live API validation, pass/fail decisions, changes to `.env.example` or shared dependencies, and logging raw prompts/responses.
+
+## Fallback if blocked
+Use the committed synthetic replay and label it clearly; preserve deterministic checks as live and report model API unavailability through the WS3 inbox.
+
+## Log
+- 2026-11-20 — Planned; no implementation or VM validation performed.
