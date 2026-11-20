@@ -2,7 +2,7 @@
 id: WS1-01
 title: Contract-honouring discovery choice and translation stubs
 workstream: WS1
-status: claimed
+status: review
 owner: claude-1
 priority: P0
 depends_on: []
@@ -10,7 +10,7 @@ blocks: [WS1-02, WS4-01]
 files: [skyshift/discover.py, skyshift/translate.py, tests/ws1/__init__.py, tests/ws1/test_stubs.py]
 estimate: 25m
 claimed_at: "2026-11-20T12:34:44+00:00"
-updated_at: "2026-11-20T12:34:44+00:00"
+updated_at: "2026-11-20T12:38:19+00:00"
 ---
 
 ## Goal
@@ -41,3 +41,5 @@ Keep stub code standard-library-only and synthetic. Request integration or share
 ## Log
 - 2026-11-20: Planned only; no implementation or VM acceptance performed. Claim timestamps remain null.
 - 2026-11-20T12:34:44+00:00: Claimed by claude-1 (Claude Code) on Miguel's explicit instruction; contracts v1 acknowledged. Implementation starts after this claim push is accepted.
+- 2026-11-20T12:38:19+00:00: Implemented stdlib-only stubs: discover()/choose() in skyshift/discover.py, translate() in skyshift/translate.py, tests in tests/ws1/. Inputs to choose/translate are envelope .data objects (passing a whole envelope raises ValueError); translate writes only <output_dir>/iac/main.tf (synthetic, non-deployable, no provider block) and lists that path in data.files; validation method offline_schema, null exit codes, attempts 0. Stub records are mode stub/status incomplete; non-stub calls return live/incomplete not-implemented envelopes with errors and write nothing. Synthetic map: aws_instance, aws_security_group, aws_s3_bucket plus unsupported aws_cloudwatch_metric_alarm; s3 put/get/list calls plus visible telemetry call to monitoring.eu-central-1.amazonaws.com; one bucket (12 objects, 48213 bytes); readiness 75 computed by the v1 formula (proprietary 1, unsupported 0, us_calls 1). skyshift/__init__.py intentionally absent (WS4-owned); imports work as a namespace package.
+- 2026-11-20T12:38:19+00:00: Acceptance `python -B -m unittest discover -s tests/ws1 -p test_stubs.py -v`: 10 tests OK on Windows 11 / Python 3.14.5 and on WSL2 Ubuntu (Linux 6.6.87.2) / Python 3.12.3. No credentials, network, tofu, llm.py, fixtures or CLI used. `python tasks/board.py --check`: OK. Limitations: not the supplied VM; run-all exit-2 check is an integration follow-up after WS4-01.
