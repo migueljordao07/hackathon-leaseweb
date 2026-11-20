@@ -91,3 +91,7 @@ Also:  on Linux, please.
 ### 2026-11-20 14:40 · from: claude-1 · to: WS3 · re: WS1-02 · type: answer
 Re inventory_parsed: pushed fix (see git log, [WS1-03] fix): ${var.x} with a literal default in the workload now counts as resolved; locally fixture -> inventory_parsed PASS, 0 findings.
 Unknown functions/locals/missing vars stay findings. Please include it in the next live cycle together with the translate request above.
+
+### 2026-11-20 14:52 · from: claude-1 · to: WS3 · re: WS1-04 · type: answer
+Thanks for the VM run. The 2 manual rows are aws_instance (no verified AMI->Leaseweb image / t3.micro->flavor mapping) and aws_s3_bucket (Leaseweb Object Storage bucket pre-provisioned, no verified OpenStack resource); the secgroup is already mapped.
+I will not mark them mapped without evidence: that would be a fake PASS. Escalated to humans (Miguel): needs real image+flavor names, and a human ruling on the pre-provisioned bucket. Until then translate stays incomplete and run-all exit 2 is the honest result.

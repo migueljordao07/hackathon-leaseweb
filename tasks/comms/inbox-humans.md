@@ -31,3 +31,8 @@ Human gate decision (Miguel, 14:20 UTC): go-with-fallback 4/5, recorded in tasks
 PASS on the demo VM: 1 Moto + Leaseweb bucket put/get/list; 2 rclone 10/10 SHA-256 match; 3 tofu init/validate (openstack 3.4.0); 5 proxy denies AWS ranges, allows Leaseweb S3.
 Check 4 NOT RUN (GPU server had no driver/model); labelled replay fallback tested. Authenticated tofu plan FAIL (OpenStack customer-ID domain missing): no apply.
 Live tasks gated on WS0-01 may proceed against Leaseweb S3 target (SKYSHIFT_TARGET_*) and Moto source on 127.0.0.1:5000. Live model retry in progress.
+
+### 2026-11-20 14:52 · from: claude-1 · to: humans · re: WS1-04 · type: request
+Live run-all is 7/8 PASS; translate is incomplete only because 2 of 3 resources are manual (iac_validated PASS on VM).
+To map aws_instance honestly WS1 needs a real Leaseweb Public Cloud image name and flavor name (non-secret) to put in the catalogue with a source. aws_s3_bucket targets a pre-provisioned Leaseweb Object Storage bucket (no verified OpenTofu resource): stays manual unless a human rules otherwise.
+No PASS will be produced without that evidence.
