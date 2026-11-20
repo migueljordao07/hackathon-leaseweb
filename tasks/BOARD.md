@@ -15,9 +15,9 @@ Planning estimates are not measured durations. Read README.md and contracts.md b
 |---|---|---|---|---|---|
 | [WS1-01](WS1-discover-translate/WS1-01-contract-stubs.md) | Contract-honouring discovery choice and translation stubs | done | claude-1 | P0 | — |
 | [WS1-02](WS1-discover-translate/WS1-02-discovery-inventory.md) | Parse AWS dependencies inventory S3 and calculate readiness | done | claude-1 | P0 | WS1-01 |
-| [WS1-03](WS1-discover-translate/WS1-03-target-catalogue.md) | Choose a verified Leaseweb target with cited criteria | todo | — | P0 | WS1-02 |
-| [WS1-04](WS1-discover-translate/WS1-04-provider-templates.md) | Render known AWS resources into approved provider templates | todo | — | P0 | WS1-03, WS0-01 |
-| [WS1-05](WS1-discover-translate/WS1-05-validation-loop.md) | Validate IaC with bounded schema-constrained AI repair | todo | — | P0 | WS1-04, WS3-01 |
+| [WS1-03](WS1-discover-translate/WS1-03-target-catalogue.md) | Choose a verified Leaseweb target with cited criteria | in_progress | claude-1 | P0 | WS1-02 |
+| [WS1-04](WS1-discover-translate/WS1-04-provider-templates.md) | Render known AWS resources into approved provider templates | in_progress | claude-1 | P0 | WS1-03, WS0-01 |
+| [WS1-05](WS1-discover-translate/WS1-05-validation-loop.md) | Validate IaC with bounded schema-constrained AI repair | in_progress | claude-1 | P0 | WS1-04, WS3-01 |
 
 ## WS2
 
@@ -40,7 +40,7 @@ Planning estimates are not measured durations. Read README.md and contracts.md b
 | [WS3-04](WS3-severance-ai/WS3-04-socket-radar.md) | Add Linux socket radar with explicit detection limits | done | claude-3 | P0 | WS3-01 |
 | [WS3-05](WS3-severance-ai/WS3-05-replacement-loop.md) | Add replacement catalogue and bounded severance retry loop | done | claude-3 | P0 | WS3-03, WS3-04 |
 | [WS3-06](WS3-severance-ai/WS3-06-llm-client-sanitizer-replay.md) | Implement one LLM client with local sanitization and cached replay | done | claude-3 | P0 | WS3-01 |
-| [WS3-07](WS3-severance-ai/WS3-07-llm-json-schema-validation.md) | Validate model schemas and the WS3 run-all demo path | todo | — | P0 | WS3-05, WS3-06, WS0-01, WS2-01, WS2-04, WS4-01 |
+| [WS3-07](WS3-severance-ai/WS3-07-llm-json-schema-validation.md) | Validate model schemas and the WS3 run-all demo path | review | claude-3 | P0 | WS3-05, WS3-06, WS0-01, WS2-01, WS2-04, WS4-01 |
 
 ## WS4
 
@@ -48,8 +48,8 @@ Planning estimates are not measured durations. Read README.md and contracts.md b
 |---|---|---|---|---|---|
 | [WS4-01](WS4-integration-delivery/WS4-01-stub-run-all.md) | Integrate the eight-step contract stubs end to end | done | claude-2 | P0 | WS1-01, WS2-01, WS3-01 |
 | [WS4-02](WS4-integration-delivery/WS4-02-evidence-report.md) | Build deterministic evidence verdicts hash chain and HTML report | todo | — | P0 | WS4-01 |
-| [WS4-03](WS4-integration-delivery/WS4-03-distribution-docs.md) | Package a fresh-clone install with jury README and Apache license | todo | — | P0 | WS4-01 |
+| [WS4-03](WS4-integration-delivery/WS4-03-distribution-docs.md) | Package a fresh-clone install with jury README and Apache license | in_progress | claude-2 | P0 | WS4-01 |
 | [WS4-04](WS4-integration-delivery/WS4-04-demo-backup.md) | Rehearse the five-minute demo and prepare a labelled backup recording | todo | — | P0 | WS4-01 |
-| [WS4-05](WS4-integration-delivery/WS4-05-core-live-integration.md) | Integrate the real pre-lunch discover translate migrate and parity path | todo | — | P0 | WS0-01, WS1-05, WS2-06, WS4-02 |
-| [WS4-06](WS4-integration-delivery/WS4-06-severance-final-evidence.md) | Integrate severance rerun and produce final measured evidence | todo | — | P0 | WS3-07, WS4-05 |
+| [WS4-05](WS4-integration-delivery/WS4-05-core-live-integration.md) | Integrate the real pre-lunch discover translate migrate and parity path | in_progress | claude-2 | P0 | WS0-01, WS1-05, WS2-06, WS4-02 |
+| [WS4-06](WS4-integration-delivery/WS4-06-severance-final-evidence.md) | Integrate severance rerun and produce final measured evidence | in_progress | claude-2 | P0 | WS3-07, WS4-05 |
 | [WS4-07](WS4-integration-delivery/WS4-07-freeze-release.md) | Freeze rehearse and release the verified demo path | todo | — | P0 | WS4-03, WS4-04, WS4-06 |

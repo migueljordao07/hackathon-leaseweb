@@ -1148,8 +1148,12 @@ class _RadarSampler:
     def __init__(self, reader):
         import threading
 
+        # Live (default reader) only: sockets already established before the attempt
+        # (operator SSH, model tunnel) are excluded and counted, not reported as bypasses.
+        self.use_baseline = reader is None
         self.reader = reader or _default_radar_reader
         self.samples: list[tuple] = []
+        self.baseline: set = set()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True, name="skyshift-radar")
 
@@ -1167,6 +1171,13 @@ class _RadarSampler:
             self._stop.wait(RADAR_SAMPLE_INTERVAL)
 
     def __enter__(self):
+        if self.use_baseline:
+            try:
+                sockets, _errors = self.reader()
+                self.baseline = {(x.get("local_port"), x.get("remote_ip"), x.get("remote_port"))
+                                 for x in sockets if x.get("state") in ("ESTABLISHED", "SYN_SENT")}
+            except Exception:  # noqa: BLE001 - no baseline means nothing is excluded
+                self.baseline = set()
         self._thread.start()
         return self
 
@@ -1177,8 +1188,23 @@ class _RadarSampler:
 
     def result(self, proxy_events: list[dict]) -> dict:
         samples = self.samples[:RADAR_MAX_SAMPLES] or [([], ["no radar sample collected"])]
+        excluded = set()
+        if self.baseline:
+            filtered = []
+            for sockets, errors in samples:
+                keep = []
+                for x in sockets:
+                    key = (x.get("local_port"), x.get("remote_ip"), x.get("remote_port"))
+                    if key in self.baseline:
+                        excluded.add(key)
+                    else:
+                        keep.append(x)
+                filtered.append((keep, errors))
+            samples = filtered
         replay = iter(samples)
-        return radar_scan(proxy_events=proxy_events, reader=lambda: next(replay), samples=len(samples))
+        result = radar_scan(proxy_events=proxy_events, reader=lambda: next(replay), samples=len(samples))
+        result["preexisting_excluded"] = len(excluded)
+        return result
 
 
 def _run_attempt(number: int, attempt_config: dict, replacement: dict | None, *, app_runner, ranges,
@@ -1331,25 +1357,112 @@ def sever(data_map: dict, target: dict, *, config: dict, max_attempts: int = 2, 
     if stub:
         return _stub_record(data_map, max_attempts)
 
-    checks = [
-        {
-            "id": "proxy_denies_cloud_egress",
-            "status": "incomplete",
-            "detail": "EgressProxy exists (WS3-03) but sever() does not run it until WS3-05; nothing measured. "
-            "Scope when run: " + PROXY_SCOPE,
-        },
-        {
-            "id": "radar_bypass_detection",
-            "status": "incomplete",
-            "detail": "radar_scan exists (WS3-04) but sever() does not run it until WS3-05; nothing measured. "
-            "Detection only, never enforcement",
-        },
-        {
-            "id": "config_only_replacement_retry",
-            "status": "incomplete",
-            "detail": "run_severance exists (WS3-05) but sever() has no app runner until WS2 run_app is wired "
-            "at WS3-07; no retry attempted",
-        },
-    ]
-    data = {"attempts": [], "max_attempts": max_attempts, "final": "incomplete", "radar_scope": RADAR_SCOPE}
-    return _envelope("live", "incomplete", checks, data, ["live severance not implemented yet; nothing was measured"])
+    needed = ("SKYSHIFT_TARGET_ENDPOINT_URL", "SKYSHIFT_TARGET_ACCESS_KEY_ID",
+              "SKYSHIFT_TARGET_SECRET_ACCESS_KEY", "SKYSHIFT_TARGET_BUCKET")
+    missing = [k for k in needed if not (isinstance(config.get(k), str) and config.get(k))]
+    if missing or not FIXTURE_APP.is_file():
+        reason = ("missing configuration: " + ", ".join(missing)) if missing else "fixture app not found"
+        checks = [
+            {"id": "proxy_denies_cloud_egress", "status": "incomplete",
+             "detail": f"live severance not run ({reason}); nothing measured. Scope when run: " + PROXY_SCOPE},
+            {"id": "radar_bypass_detection", "status": "incomplete",
+             "detail": f"live severance not run ({reason}); nothing measured. Detection only, never enforcement"},
+            {"id": "config_only_replacement_retry", "status": "incomplete",
+             "detail": f"live severance not run ({reason}); no retry attempted"},
+        ]
+        data = {"attempts": [], "max_attempts": max_attempts, "final": "incomplete", "radar_scope": RADAR_SCOPE}
+        return _envelope("live", "incomplete", checks, data, [f"live severance not run: {reason}; nothing was measured"])
+    ranges = live_ranges()
+    runner = fixture_app_runner(config)
+    record = run_severance(data_map, target, config=_severance_config(config), app_runner=runner,
+                           max_attempts=max_attempts, ranges=ranges)
+    record["data"]["range_sources"] = {
+        p: {"source": "synthetic fixture" if src.get("synthetic") else src.get("source_url"),
+            "retrieved_at": src.get("retrieved_at")}
+        for p, src in sorted(ranges.sources.items())
+    }
+    record["data"]["app_sha256_before"] = runner.hash_before
+    record["data"]["app_sha256_after"] = _sha256_file(runner.app_path)
+    if record["data"]["app_sha256_after"] != runner.hash_before:
+        record["status"] = "FAIL"
+        record["errors"].append("fixture app bytes changed during severance")
+    record["errors"].extend(ranges.errors)
+    return record
+
+
+# ---------------------------------------------------------------------------
+# Live wiring (WS3-07): published ranges + unchanged fixture app runner.
+# ---------------------------------------------------------------------------
+
+FIXTURE_APP = Path(__file__).resolve().parents[1] / "fixtures" / "aws_workload" / "app.py"
+APP_TIMEOUT_SECONDS = 90
+
+
+def live_ranges() -> RangeSet:
+    """AWS/Google/Cloudflare from their published feeds; Azure (no stable feed URL) from the fixture, labelled synthetic."""
+    ranges = RangeSet()
+    for provider in ("aws", "google", "cloudflare"):
+        ranges = ranges.merge(load_published_feed(provider, approved_urls=PUBLISHED_FEEDS[provider]))
+    fixture = load_ranges()
+    azure = RangeSet(entries=[e for e in fixture.entries if e.provider == "azure"],
+                     sources={k: v for k, v in fixture.sources.items() if k == "azure"})
+    return ranges.merge(azure)
+
+
+def _sha256_file(path: Path) -> str | None:
+    import hashlib
+
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def _severance_config(config: dict) -> dict:
+    """Map contract target settings onto the unchanged app's AWS_* names (config only)."""
+    out = {k: v for k, v in config.items() if isinstance(v, str)}
+    mapping = {"AWS_ENDPOINT_URL": "SKYSHIFT_TARGET_ENDPOINT_URL", "AWS_ACCESS_KEY_ID": "SKYSHIFT_TARGET_ACCESS_KEY_ID",
+               "AWS_SECRET_ACCESS_KEY": "SKYSHIFT_TARGET_SECRET_ACCESS_KEY"}
+    for app_key, target_key in mapping.items():
+        if config.get(target_key):
+            out[app_key] = config[target_key]
+    out.pop("SKYSHIFT_TELEMETRY_ENDPOINT", None)  # first attempt uses the app's default (AWS) telemetry
+    return out
+
+
+def fixture_app_runner(config: dict, app_path: Path = FIXTURE_APP):
+    """Runner that executes the unchanged fixture app once per attempt in a bounded subprocess.
+
+    Direct runner used until WS2-04 ``run_app`` exposes a per-attempt env hook; the label says so.
+    """
+    import subprocess
+    import sys
+
+    hash_before = _sha256_file(app_path)
+    passthrough = ("PATH", "HOME", "SYSTEMROOT", "TMPDIR", "LANG")
+
+    def runner(env: dict) -> dict:
+        import os
+
+        child = {k: os.environ[k] for k in passthrough if k in os.environ}
+        child.update({k: v for k, v in env.items() if k.startswith(("AWS_", "SKYSHIFT_TARGET_BUCKET",
+                                                                     "SKYSHIFT_TELEMETRY_", "HTTP", "NO_PROXY"))})
+        child["NO_PROXY"] = ""
+        try:
+            proc = subprocess.run([sys.executable, str(app_path), "--require-telemetry"], env=child,
+                                  capture_output=True, timeout=APP_TIMEOUT_SECONDS, shell=False)
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "detail": f"app timed out after {APP_TIMEOUT_SECONDS}s"}
+        detail = f"unchanged app exit {proc.returncode}"
+        try:
+            result = json.loads(proc.stdout.decode("utf-8", "replace").strip().splitlines()[-1])
+            tel = result.get("telemetry", {}) if isinstance(result, dict) else {}
+            detail += f"; s3 checks {'PASS' if result.get('status') == 'PASS' or proc.returncode == 0 else 'see telemetry'}"                       f"; telemetry {tel.get('status')}"
+        except Exception:  # noqa: BLE001 - output shape is informational only
+            pass
+        return {"ok": proc.returncode == 0, "detail": detail[:300]}
+
+    runner.label = "direct unchanged-app subprocess (fixtures/aws_workload/app.py --require-telemetry)"
+    runner.hash_before = hash_before
+    runner.app_path = app_path
+    return runner

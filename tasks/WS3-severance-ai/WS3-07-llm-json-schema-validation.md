@@ -2,15 +2,15 @@
 id: WS3-07
 title: Validate model schemas and the WS3 run-all demo path
 workstream: WS3
-status: todo
-owner: null
+status: review
+owner: claude-3
 priority: P0
 depends_on: [WS3-05, WS3-06, WS0-01, WS2-01, WS2-04, WS4-01]
 blocks: [WS4-06]
 files: [skyshift/llm.py, skyshift/sever.py, tests/ws3/test_llm_schema.py, tests/ws3/test_demo_path.py]
 estimate: 60m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T14:37:00+00:00"
+updated_at: "2026-11-20T14:38:00+00:00"
 ---
 
 ## Goal
@@ -44,3 +44,5 @@ Mark schema-dependent response incomplete; request an approved dependency/interf
 
 ## Log
 - 2026-11-20 — Planned; no implementation or VM validation performed.
+- 2026-11-20 14:38 UTC — claude-3 (SPEED MODE assignment): live sever() wired. Ranges: AWS/Google/Cloudflare live published feeds (fetched per run), Azure synthetic fixture (labelled). Runner: direct bounded subprocess of the unchanged fixtures/aws_workload/app.py --require-telemetry with target settings mapped to AWS_* config (WS2-04 run_app had no per-attempt env hook yet). Radar excludes sockets established before each attempt (operator SSH, model tunnel) and counts them. Missing target config => incomplete, no network.
+- 2026-11-20 14:38 UTC — VM live (Ubuntu 26.04.1, py3.14, Leaseweb S3 target): sever PASS. Attempt 1 FAIL: monitoring.eu-central-1.amazonaws.com:443 denied twice (published cloud range aws), app exit 1 (telemetry required). Attempt 2 with local-otel config-only replacement: app exit 0, receiver 1 receipt, 0 radar bypasses, final green; app SHA-256 unchanged. tests/ws3 offline OK (+4 demo-path tests, 1 opt-in live). test_llm_schema.py not written (llm schema validation already covered by test_llm_client.py). Review: WS2-04 run_app swap pending.
