@@ -2,15 +2,15 @@
 id: WS3-02
 title: Implement provenance-aware IP range matching
 workstream: WS3
-status: todo
-owner: null
+status: claimed
+owner: claude-3
 priority: P0
 depends_on: [WS3-01]
 blocks: [WS3-03]
 files: [skyshift/sever.py, fixtures/ip-ranges/ranges.json, tests/ws3/test_ip_ranges.py]
 estimate: 35m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T12:43:35+00:00"
+updated_at: "2026-11-20T12:43:35+00:00"
 ---
 
 ## Goal
@@ -38,3 +38,4 @@ Treat unavailable or invalid range information as unknown/deny, retain the synth
 
 ## Log
 - 2026-11-20 — Planned; no implementation or VM validation performed.
+- 2026-11-20T12:43:35+00:00 — Claimed by claude-3 (Claude Code) after WS3-01 done; offline matcher and mocked feed loader only, no live fetch.
