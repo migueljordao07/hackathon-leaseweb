@@ -232,6 +232,32 @@ def render(template: str, values: dict[str, str]) -> str:
     return _PLACEHOLDER.sub(substitute, template)
 
 
+def _sever_section(records: list[dict]) -> tuple[str, str, str]:
+    """Escaped rows for every severance attempt, preserving red -> fix -> green history."""
+    sever = next((r for r in records if isinstance(r, dict) and r.get("step") == "sever"), None)
+    data = sever.get("data") if isinstance(sever, dict) else None
+    if not isinstance(data, dict):
+        return "incomplete", "no severance record", "<tr><td colspan=\"6\">no attempts recorded</td></tr>"
+    rows = []
+    for attempt in data.get("attempts") or []:
+        if not isinstance(attempt, dict):
+            continue
+        events = attempt.get("events") or []
+        conns = "; ".join(
+            f"{e.get('host')}:{e.get('port')} {e.get('decision')} via {e.get('via')}"
+            for e in events if isinstance(e, dict)) or "none recorded"
+        repl = attempt.get("replacement")
+        repl_text = (f"{repl.get('id')} ({repl.get('mode')})" if isinstance(repl, dict)
+                     else "none")
+        bypasses = attempt.get("bypasses") or []
+        rows.append(
+            f"<tr><td>{_e(attempt.get('number'))}</td>{_status_cell(attempt.get('status'))}"
+            f"<td>{_e(attempt.get('blocked'))}</td><td>{_e(conns)}</td>"
+            f"<td>{_e(repl_text)}</td><td>{_e(len(bypasses))}</td></tr>")
+    return (str(data.get("final")), str(data.get("radar_scope") or "not stated"),
+            "\n".join(rows) or "<tr><td colspan=\"6\">no attempts recorded</td></tr>")
+
+
 def render_report(records: list[dict], evidence: dict, *, stub: bool,
                   template_path: Path = TEMPLATE_PATH) -> str:
     data = evidence["data"]
@@ -269,6 +295,7 @@ def render_report(records: list[dict], evidence: dict, *, stub: bool,
                 f"<tr><td>{_e(step)}</td><td>{_e(check.get('id'))}</td>"
                 f"{_status_cell(check.get('status'))}<td>{_e(check.get('detail'))}</td></tr>")
     open_items = "".join(f"<li>{_e(item)}</li>" for item in data["open_items"])
+    sever_final, sever_scope, sever_rows = _sever_section(records)
 
     values = {
         "banner": _e(banner),
@@ -281,6 +308,9 @@ def render_report(records: list[dict], evidence: dict, *, stub: bool,
         "step_rows": "\n".join(step_rows),
         "check_rows": "\n".join(check_rows),
         "open_items": open_items or "<li>none</li>",
+        "sever_final": _e(sever_final),
+        "sever_scope": _e(sever_scope),
+        "sever_rows": sever_rows,
     }
     return render(Path(template_path).read_text(encoding="utf-8"), values)
 

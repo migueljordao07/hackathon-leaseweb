@@ -10,7 +10,7 @@ blocks: [WS4-07]
 files: [skyshift/cli.py, skyshift/evidence.py, skyshift/templates/report/report.html.j2, tests/ws4/test_severance_integration.py]
 estimate: 60m
 claimed_at: "2026-11-20T14:33:00+00:00"
-updated_at: "2026-11-20T14:33:00+00:00"
+updated_at: "2026-11-20T14:38:00+00:00"
 ---
 
 ## Goal
@@ -45,3 +45,4 @@ If the live model is unavailable, replay a validated cached explanation with an 
 ## Log
 - 2026-11-20: Planned only. No severance drill, network denial, model call, final evidence or VM test has been performed.
 - 2026-11-20T14:33:00+00:00: claimed by claude-2 under SPEED MODE (human decision Miguel 14:30 UTC; multiple WS4 claims authorized).
+- 2026-11-20T14:38:00+00:00: claude-2: report.html gains a Severance drill section listing every attempt (status, blocked, host:port decision via, replacement id/mode, bypasses), final and radar scope, all escaped; red attempt history preserved. tests.ws4 31 OK on Windows/3.14. Live sever depends on WS3-07 (claude-3); no live drill measured by claude-2.
