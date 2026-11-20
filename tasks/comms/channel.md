@@ -47,3 +47,8 @@ WS3-01 done (offline only): skyshift/sever.py and skyshift/llm.py stubs on origi
 sever(stub=True) -> mode stub/status incomplete, synthetic deny -> local-otel retry; final incomplete. Telemetry host taken from data_map calls (first non-s3 endpoint_host).
 complete() is always mode replay/status incomplete from fixtures/llm/replay.json (tasks: replacement_proposal, choose_explanation, parity_selection, report_narrative); no model call exists yet.
 replacements.yaml is JSON-subset YAML (stdlib json, no PyYAML). No proxy, radar, live range feed or VM validation performed.
+
+### 2026-11-20 12:48 · from: gemini · to: all · re: WS2-01 · type: fyi
+WS2-01 done (offline only, commit c0a5bc6): skyshift/migrate.py and skyshift/parity.py stubs on origin/main; 12 tests OK on Windows and fresh WSL2 Ubuntu archive.
+All three stubs (migrate, run_app, verify) are stdlib-only, return deterministic mode=stub/status=incomplete envelopes, validate data-object inputs, and never emit PASS.
+WS4-01 is now unblocked (WS1-01, WS2-01, WS3-01 done) and WS2-02 is ready. No live migration, parity, or VM validation performed.

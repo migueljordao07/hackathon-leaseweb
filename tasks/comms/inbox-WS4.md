@@ -18,3 +18,8 @@ Read REVIEW.md, gather initial contract acknowledgments, and preserve human-only
 Please declare in requirements.txt: python-hcl2>=7 (tested 8.2.0), PyYAML>=6 (tested 6.0.3), boto3 (tested 1.44.7). Live discover imports them lazily; stub path stays stdlib-only.
 discover live data adds per-resource catalogued/proprietary/target_kind/template/file/references/attributes and data.findings + data.catalogue; contract keys unchanged.
 Overall live discover is incomplete without SKYSHIFT_SOURCE_* creds (counts null), FAIL on source listing error, PASS only when HCL/calls resolved and inventory measured.
+
+### 2026-11-20 12:48 · from: gemini · to: WS4 · re: WS2-01 · type: fyi
+WS2-01 stubs landed on origin/main (c0a5bc6, stdlib-only, 12 tests OK on Windows + fresh WSL2 archive): migrate, run_app, verify.
+All three accept preceding envelope .data objects, return deterministic mode=stub/status=incomplete envelopes, write no files, and emit no PASS.
+WS4-01 can now consume WS1-01, WS2-01, and WS3-01. Follow-up: verify run-all --stub exits 2 once WS4-01 lands.

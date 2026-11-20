@@ -2,7 +2,7 @@
 id: WS2-01
 title: Contract-honouring data and parity stubs
 workstream: WS2
-status: review
+status: done
 owner: gemini
 priority: P0
 depends_on: []
@@ -10,7 +10,7 @@ blocks: [WS2-02, WS3-07, WS4-01]
 files: [skyshift/migrate.py, skyshift/parity.py, tests/ws2/__init__.py, tests/ws2/test_stubs.py]
 estimate: 30m
 claimed_at: "2026-11-20T12:35:55+00:00"
-updated_at: "2026-11-20T12:44:30+00:00"
+updated_at: "2026-11-20T12:48:05+00:00"
 ---
 
 ## Goal
@@ -55,3 +55,4 @@ If another product module is unavailable, keep imports local or use JSON-compati
 - 2026-11-20T12:35:55+00:00 — Claimed by gemini. Read AGENTS.md, tasks/README.md, tasks/contracts.md, tasks/REVIEW.md, tasks/comms/channel.md, and tasks/comms/inbox-WS2.md; contracts v1 acknowledged. Implementation starts after claim push is accepted.
 - 2026-11-20T12:44:30+00:00 — Implemented stdlib-only offline stubs: `migrate` in `skyshift/migrate.py`, `run_app` and `verify` in `skyshift/parity.py`, package marker `tests/ws2/__init__.py`, and offline tests in `tests/ws2/test_stubs.py`. All three functions validate data-object inputs (rejecting whole envelopes and bad configs with ValueError), never mutate inputs, write no files, leak no secrets, and return deterministic `mode="stub"`, `status="incomplete"` envelopes with no PASS checks. Non-stub calls return explicit not-implemented `mode="live"`, `status="incomplete"` envelopes with errors.
 - 2026-11-20T12:44:30+00:00 — Review acceptance: `python -B -m unittest discover -s tests/ws2 -p test_stubs.py -v` 12 tests OK on Windows 11 / Python 3.14.5 and on WSL2 Ubuntu (Linux 6.6.87.2-microsoft-standard-WSL2) / Python 3.12.3; `python tasks/board.py --check` OK (26 tasks valid). Limitations: local WSL2 Linux only, not the supplied hackathon VM; no migration, parity, VM gate, or run-all live proof claimed; run-all exit-2 check is a follow-up after WS4-01.
+- 2026-11-20T12:48:05+00:00 — Done. Verified commit `c0a5bc6` on origin/main in a fresh git archive on WSL2 Ubuntu (Linux 6.6.87.2-microsoft-standard-WSL2, Python 3.12.3): `python3 -B -m unittest discover -s tests/ws2 -p test_stubs.py -v` 12 tests OK; `python3 tasks/board.py --check` OK. Verified by executor gemini (not yet by human supervisors Carolina/Miguel, who may reopen to review). No migration, parity, VM gate, or run-all live proof claimed; run-all exit-2 check remains a follow-up after WS4-01.

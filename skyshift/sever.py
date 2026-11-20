@@ -359,6 +359,342 @@ def save_snapshot(ranges: RangeSet, out_dir: Path) -> Path:
     return path
 
 
+# ---------------------------------------------------------------------------
+# Allowlist egress proxy (WS3-03)
+#
+# Local, loopback-only HTTP proxy with HTTPS CONNECT. Policy: a destination is
+# allowed only if its exact (host, port) is on the allowlist derived from the
+# approved target/telemetry configuration AND every resolved address passes the
+# range matcher. The proxy then connects to the exact address it checked (no
+# second resolution), so DNS rebinding between check and connect cannot reach a
+# denied range. Every failure path closes the client; there is no direct-access
+# fallback. Nothing listens until ``EgressProxy.start()`` is called.
+# ---------------------------------------------------------------------------
+
+PROXY_SCOPE = (
+    "proxy enforcement applies only to clients that use HTTP(S)_PROXY; it does not block "
+    "direct sockets, UDP or DNS (radar detects, firewall out of scope)"
+)
+ALLOWLIST_CONFIG_KEYS = ("SKYSHIFT_TELEMETRY_ENDPOINT", "SKYSHIFT_TARGET_ENDPOINT_URL", "AWS_ENDPOINT_URL")
+PROXY_MAX_HEADER_BYTES = 16 * 1024
+PROXY_IO_TIMEOUT = 5.0
+PROXY_TUNNEL_MAX_SECONDS = 30.0
+PROXY_TUNNEL_MAX_BYTES = 8 * 1024 * 1024
+PROXY_MAX_CONNECTIONS = 32
+RESOLVE_TIMEOUT = 3.0
+
+
+def _endpoint(url: str) -> tuple[str, int] | None:
+    from urllib.parse import urlsplit
+
+    try:
+        parts = urlsplit(url.strip())
+        host = (parts.hostname or "").lower()
+        port = parts.port or {"https": 443, "http": 80}.get(parts.scheme)
+    except (ValueError, AttributeError):
+        return None
+    return (host, port) if host and port else None
+
+
+def allowlist_from_config(config: dict, extra: Iterable[tuple[str, int]] = ()) -> frozenset:
+    """Exact (host, port) pairs from approved configuration keys only.
+
+    Never derived from model output. Credentials embedded in URLs are dropped
+    because only hostname and port are kept.
+    """
+    if not isinstance(config, dict):
+        raise ValueError("config must be a dict")
+    pairs = set()
+    for key in ALLOWLIST_CONFIG_KEYS:
+        value = config.get(key)
+        if isinstance(value, str) and value:
+            endpoint = _endpoint(value)
+            if endpoint:
+                pairs.add(endpoint)
+    for host, port in extra:
+        pairs.add((str(host).lower(), int(port)))
+    return frozenset(pairs)
+
+
+def _default_resolver(host: str, port: int) -> list[str]:
+    """getaddrinfo bounded by a worker-thread timeout. Raises OSError on failure."""
+    import socket
+    import threading
+
+    box: dict = {}
+
+    def work():
+        try:
+            box["infos"] = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        except OSError as exc:  # pragma: no cover - depends on resolver
+            box["error"] = exc
+
+    worker = threading.Thread(target=work, daemon=True)
+    worker.start()
+    worker.join(RESOLVE_TIMEOUT)
+    if "infos" not in box:
+        raise OSError("resolution failed or timed out")
+    return list(dict.fromkeys(info[4][0] for info in box["infos"]))
+
+
+def _default_connector(ip: str, port: int, timeout: float):
+    import socket
+
+    return socket.create_connection((ip, port), timeout=timeout)
+
+
+def decide(host: str, port: int, *, allowlist: frozenset, ranges: RangeSet,
+           resolver: Callable[[str, int], list[str]] | None = None, now: datetime | None = None) -> dict:
+    """Return a sanitized proxy event plus the address to connect to (if allowed).
+
+    Order: resolve (unresolved => deny), range check on every address
+    (cloud/unknown => deny), then exact allowlist (absent => deny).
+    """
+    host = str(host or "").strip().lower().strip("[]")
+    event = {"host": host, "ip": None, "port": port, "decision": "deny", "reason": "", "via": "proxy"}
+    if not host or not isinstance(port, int) or not 0 < port < 65536:
+        return {**event, "reason": "malformed destination; fail closed", "connect_ip": None}
+    try:
+        addresses = list((resolver or _default_resolver)(host, port))
+    except Exception:  # noqa: BLE001 - any resolver failure fails closed
+        addresses = []
+    if not addresses:
+        return {**event, "reason": "unresolved destination; fail closed", "connect_ip": None}
+    verdict = classify_addresses(addresses, ranges, now=now)
+    first = next((m for m in verdict["matches"] if m["deny"]), verdict["matches"][0])
+    event["ip"] = first["ip"]
+    if verdict["deny"]:
+        reason = "published cloud range" if verdict["verdict"] == "cloud_range" else verdict["reason"]
+        if verdict["verdict"] == "cloud_range" and first.get("provider"):
+            reason = f"published cloud range ({first['provider']}{', synthetic fixture' if first['synthetic'] else ''})"
+        return {**event, "reason": reason, "connect_ip": None}
+    if (host, port) not in allowlist:
+        return {**event, "reason": "not on allowlist", "connect_ip": None}
+    return {**event, "decision": "allow", "reason": "approved host and port", "connect_ip": first["ip"]}
+
+
+class EgressProxy:
+    """Bounded loopback proxy. Use as a context manager; ``events`` holds sanitized decisions."""
+
+    def __init__(self, *, allowlist: frozenset, ranges: RangeSet,
+                 resolver: Callable[[str, int], list[str]] | None = None,
+                 connector: Callable | None = None, clock: Callable[[], datetime] | None = None,
+                 io_timeout: float = PROXY_IO_TIMEOUT, tunnel_max_seconds: float = PROXY_TUNNEL_MAX_SECONDS,
+                 tunnel_max_bytes: int = PROXY_TUNNEL_MAX_BYTES, max_connections: int = PROXY_MAX_CONNECTIONS):
+        import threading
+
+        self.allowlist = frozenset(allowlist)
+        self.ranges = ranges
+        self.resolver = resolver
+        self.connector = connector or _default_connector
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.io_timeout = io_timeout
+        self.tunnel_max_seconds = tunnel_max_seconds
+        self.tunnel_max_bytes = tunnel_max_bytes
+        self._slots = threading.BoundedSemaphore(max_connections)
+        self._lock = threading.Lock()
+        self._events: list[dict] = []
+        self._threads: list = []
+        self._sockets: set = set()
+        self._listener = None
+        self._stopping = threading.Event()
+        self.address: tuple[str, int] | None = None
+
+    # -- lifecycle -----------------------------------------------------------
+    def start(self) -> "EgressProxy":
+        import socket
+        import threading
+
+        if self._listener is not None:
+            raise RuntimeError("proxy already started")
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind(("127.0.0.1", 0))  # loopback only
+        listener.listen(16)
+        listener.settimeout(0.2)
+        self._listener = listener
+        self.address = listener.getsockname()
+        thread = threading.Thread(target=self._accept_loop, name="skyshift-proxy", daemon=True)
+        thread.start()
+        self._threads.append(thread)
+        return self
+
+    def stop(self) -> None:
+        self._stopping.set()
+        if self._listener is not None:
+            self._listener.close()
+        with self._lock:
+            sockets = list(self._sockets)
+        for sock in sockets:
+            self._close(sock)
+        for thread in list(self._threads):
+            thread.join(timeout=2.0)
+
+    def __enter__(self) -> "EgressProxy":
+        return self.start()
+
+    def __exit__(self, *_exc) -> None:
+        self.stop()
+
+    @property
+    def url(self) -> str:
+        if self.address is None:
+            raise RuntimeError("proxy not started")
+        return f"http://{self.address[0]}:{self.address[1]}"
+
+    @property
+    def events(self) -> list[dict]:
+        with self._lock:
+            return [dict(e) for e in self._events]
+
+    # -- internals -----------------------------------------------------------
+    def _track(self, sock) -> None:
+        with self._lock:
+            self._sockets.add(sock)
+
+    def _close(self, sock) -> None:
+        if sock is None:
+            return
+        with self._lock:
+            self._sockets.discard(sock)
+        try:
+            sock.close()
+        except OSError:
+            pass
+
+    def _record(self, event: dict, outcome: str) -> None:
+        clean = {k: event[k] for k in ("host", "ip", "port", "decision", "reason", "via")}
+        clean["outcome"] = outcome
+        with self._lock:
+            self._events.append(clean)
+
+    def _accept_loop(self) -> None:
+        import socket
+        import threading
+
+        while not self._stopping.is_set():
+            try:
+                client, _ = self._listener.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            if not self._slots.acquire(blocking=False):
+                self._close(client)
+                continue
+            self._track(client)
+            thread = threading.Thread(target=self._serve, args=(client,), daemon=True)
+            self._threads = [t for t in self._threads if t.is_alive()] + [thread]
+            thread.start()
+
+    def _read_head(self, client) -> tuple[bytes, bytes] | None:
+        data = b""
+        while b"\r\n\r\n" not in data:
+            chunk = client.recv(4096)
+            if not chunk:
+                return None
+            data += chunk
+            if len(data) > PROXY_MAX_HEADER_BYTES:
+                return None
+        head, rest = data.split(b"\r\n\r\n", 1)
+        return head, rest
+
+    @staticmethod
+    def _reply(client, code: int, text: str) -> None:
+        body = text.encode("ascii", "replace")
+        try:
+            client.sendall(b"HTTP/1.1 %d %s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n"
+                           b"Connection: close\r\n\r\n%s" % (code, text.encode("ascii", "replace"), len(body), body))
+        except OSError:
+            pass
+
+    def _serve(self, client) -> None:
+        upstream = None
+        try:
+            client.settimeout(self.io_timeout)
+            parsed = self._read_head(client)
+            if parsed is None:
+                self._reply(client, 400, "Bad Request")
+                return
+            head, rest = parsed
+            lines = head.decode("latin-1").split("\r\n")
+            parts = lines[0].split(" ")
+            if len(parts) != 3:
+                self._reply(client, 400, "Bad Request")
+                return
+            method, target, _version = parts
+            if method.upper() == "CONNECT":
+                host, _, port_text = target.rpartition(":")
+                path = None
+            else:
+                endpoint = _endpoint(target) if target.lower().startswith("http://") else None
+                if endpoint is None:
+                    self._reply(client, 400, "Bad Request")
+                    return
+                host, port_text = endpoint[0], str(endpoint[1])
+                from urllib.parse import urlsplit
+
+                split = urlsplit(target)
+                path = (split.path or "/") + (f"?{split.query}" if split.query else "")
+            try:
+                port = int(port_text)
+            except ValueError:
+                port = -1
+            event = decide(host, port, allowlist=self.allowlist, ranges=self.ranges,
+                           resolver=self.resolver, now=self.clock())
+            if event["decision"] != "allow":
+                self._record(event, "blocked")
+                self._reply(client, 403, "Forbidden by SkyShift egress policy")
+                return
+            try:
+                upstream = self.connector(event["connect_ip"], port, self.io_timeout)
+            except OSError:
+                self._record(event, "upstream_error")
+                self._reply(client, 502, "Bad Gateway")
+                return
+            self._track(upstream)
+            if path is None:
+                self._record(event, "tunnel")
+                client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            else:
+                self._record(event, "forwarded")
+                headers = [h for h in lines[1:] if h and not h.lower().startswith(("proxy-", "connection:"))]
+                request = f"{method} {path} HTTP/1.1\r\n" + "".join(f"{h}\r\n" for h in headers)
+                request += "Connection: close\r\n\r\n"
+                upstream.sendall(request.encode("latin-1") + rest)
+                rest = b""
+            if rest:
+                upstream.sendall(rest)
+            self._relay(client, upstream)
+        except Exception:  # noqa: BLE001 - never fall back to direct access
+            pass
+        finally:
+            self._close(upstream)
+            self._close(client)
+            self._slots.release()
+
+    def _relay(self, client, upstream) -> None:
+        import select
+        import time
+
+        deadline = time.monotonic() + self.tunnel_max_seconds
+        moved = 0
+        peers = {client: upstream, upstream: client}
+        while not self._stopping.is_set():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            readable, _, _ = select.select(list(peers), [], [], min(remaining, 0.5))
+            for sock in readable:
+                data = sock.recv(65536)
+                if not data:
+                    return
+                moved += len(data)
+                if moved > self.tunnel_max_bytes:
+                    return
+                peers[sock].sendall(data)
+
+
 def _envelope(mode: str, status: str, checks: list, data: dict, errors: list) -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
@@ -457,7 +793,7 @@ def _stub_record(data_map: dict, max_attempts: int) -> dict:
         {
             "id": "proxy_denies_cloud_egress",
             "status": "incomplete",
-            "detail": "synthetic stub; no proxy started, no VM validation",
+            "detail": "synthetic stub; no proxy started, no VM validation. Scope when run: " + PROXY_SCOPE,
         },
         {
             "id": "radar_bypass_detection",
@@ -494,7 +830,8 @@ def sever(data_map: dict, target: dict, *, config: dict, max_attempts: int = 2, 
         {
             "id": "proxy_denies_cloud_egress",
             "status": "incomplete",
-            "detail": "not implemented (WS3-03); no proxy started",
+            "detail": "EgressProxy exists (WS3-03) but sever() does not run it until WS3-05; nothing measured. "
+            "Scope when run: " + PROXY_SCOPE,
         },
         {
             "id": "radar_bypass_detection",
