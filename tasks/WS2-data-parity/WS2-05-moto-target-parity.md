@@ -2,15 +2,15 @@
 id: WS2-05
 title: Moto-before versus target-after parity table
 workstream: WS2
-status: todo
-owner: null
+status: in_progress
+owner: gemini
 priority: P0
 depends_on: [WS2-04]
 blocks: [WS2-06]
 files: [skyshift/parity.py, tests/ws2/test_parity.py]
 estimate: 60m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T14:35:00+00:00"
+updated_at: "2026-11-20T14:35:00+00:00"
 ---
 
 ## Goal
@@ -56,3 +56,4 @@ If Moto cannot run as a server, use its in-process mode while preserving the sam
 ## Log
 
 - 2026-11-20 12:07 UTC — Planned parity implementation. Moto and target checks have not run.
+- 2026-11-20 14:35 UTC — Claimed by gemini under SPEED MODE (working WS2-04 then WS2-05 in sequence).
