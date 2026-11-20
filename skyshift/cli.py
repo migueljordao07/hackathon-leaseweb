@@ -212,7 +212,11 @@ def _invoke(step: str, records: dict, *, workload: Path, out: Path, config: dict
     if step == "migrate":
         return migrate_mod.migrate(data("discover"), data("choose"), config=config, stub=stub)
     if step == "run":
-        return parity_mod.run_app(workload, data("choose"), config=config, stub=stub)
+        # The app runs with its own directory as cwd; an absolute path keeps a relative
+        # --workload valid there. Other steps keep the relative path so records do not
+        # expose host directories.
+        return parity_mod.run_app(Path(workload).resolve(), data("choose"), config=config,
+                                  stub=stub)
     if step == "parity":
         return parity_mod.verify(data("discover"), data("choose"), config=config, stub=stub)
     if step == "sever":
