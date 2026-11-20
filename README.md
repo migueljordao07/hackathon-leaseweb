@@ -113,6 +113,10 @@ tests/               offline unit tests per workstream
 tasks/               team task board and coordination log
 ```
 
+## How it was built
+
+SkyShift was built in one day by a team of five humans orchestrating four AI coding agents (three Claude Code instances and Gemini CLI) that coordinated only through Git, using the task board, contracts and append-only message channel in [tasks/](tasks/). Deterministic code, not the AI, decides every PASS/FAIL.
+
 ## License
 
 [Apache License 2.0](LICENSE). Third-party tools and services keep their own licenses.
