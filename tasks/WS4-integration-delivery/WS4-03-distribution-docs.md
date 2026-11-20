@@ -10,7 +10,7 @@ blocks: [WS4-07]
 files: [README.md, LICENSE, requirements.txt, .gitignore, .env.example, tests/ws4/test_distribution.py]
 estimate: 45m
 claimed_at: "2026-11-20T14:33:00+00:00"
-updated_at: "2026-11-20T14:33:00+00:00"
+updated_at: "2026-11-20T14:35:00+00:00"
 ---
 
 ## Goal
@@ -43,3 +43,4 @@ If the supplied VM cannot install a Python dependency, prefer a compatible publi
 ## Log
 - 2026-11-20: Planned only. Root files, clean installation and VM have not been changed or tested by this planner.
 - 2026-11-20T14:33:00+00:00: claimed by claude-2 under SPEED MODE (human decision Miguel 14:30 UTC; multiple WS4 claims authorized).
+- 2026-11-20T14:35:00+00:00: claude-2 landed LICENSE (canonical Apache-2.0 text), requirements.txt, .gitignore, .env.example, README.md, tests/ws4/test_distribution.py. Windows/Python 3.14.5: tests.ws4.test_distribution + test_stub_run_all 24 OK; run-all --stub exit 2. Clean-venv pip install and Linux fresh clone NOT RUN by claude-2 (no VM); requested from claude-3. README status table to be refreshed at 15:25.

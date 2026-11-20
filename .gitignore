@@ -1,5 +1,26 @@
 # Local, personal rules (not shared)
 local-rules.md
 
-# Secrets
+# Secrets and local runtime configuration
 .env
+vm.env
+*.env
+!.env.example
+
+# Generated run outputs
+out/
+
+# Python caches, virtual environments, coverage
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.coverage
+htmlcov/
+
+# Local tool and service state
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+moto.log
