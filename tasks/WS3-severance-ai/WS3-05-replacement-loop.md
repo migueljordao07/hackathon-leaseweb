@@ -2,7 +2,7 @@
 id: WS3-05
 title: Add replacement catalogue and bounded severance retry loop
 workstream: WS3
-status: claimed
+status: done
 owner: claude-3
 priority: P0
 depends_on: [WS3-03, WS3-04]
@@ -10,7 +10,7 @@ blocks: [WS3-07]
 files: [skyshift/sever.py, skyshift/catalogue/replacements.yaml, tests/ws3/test_replacement_loop.py]
 estimate: 45m
 claimed_at: "2026-11-20T12:54:19+00:00"
-updated_at: "2026-11-20T12:54:19+00:00"
+updated_at: "2026-11-20T12:57:19+00:00"
 ---
 
 ## Goal
@@ -39,3 +39,6 @@ Return `blocked` with manual action needed and preserve evidence; ask WS4 throug
 ## Log
 - 2026-11-20 — Planned; no implementation or VM validation performed.
 - 2026-11-20T12:54:19+00:00 — Claimed by claude-3 (Claude Code); loop composes WS3-03 proxy + WS3-04 radar with an injected app runner (fixture app not yet on main), loopback receiver, replay-only proposals.
+- 2026-11-20T12:57:19+00:00 — Done (offline/loopback scope). Code in ac7a0f8: replacements.yaml local-otel gains host patterns (monitoring[.*].amazonaws.com), protocol http-post, config template http://127.0.0.1:{port}, allowed_config_keys, synthetic/demo provenance, code_change false. sever.py adds load_catalogue, select_replacement (deterministic fnmatch), TelemetryReceiver (127.0.0.1 HTTP POST, 1 MiB cap, counts path/bytes, discards bodies; explicitly not an OTel collector), run_severance (1..5 attempts; per attempt: receiver + EgressProxy + background radar sampler around one injected app_runner call; NO_PROXY empty; first denial preserved; unknown host -> manual + blocked; same fix twice/exhaustion -> blocked; runner crash or unavailable radar -> incomplete; proposals only via llm.complete-shaped proposer, schema enum-limited to catalogue IDs/keys, deterministic choice kept on disagreement/failure). sever() public envelope unchanged; non-stub sever() stays incomplete until WS3-07 wires WS2 run_app.
+  - Acceptance on fresh WSL2 Ubuntu clone at ac7a0f8 (Python 3.12.3): `python3 -B -m unittest tests.ws3.test_replacement_loop` 10 OK (red->config-only->green with denial retained and receiver receipt, exhaustion max 1 and stubborn app, unknown dependency manual/blocked, invalid limits, rogue/broken/absent proposer, radar bypass FAIL, crashing runner/unavailable radar incomplete, sever entry unchanged); all tests/ws3 63 OK; board --check OK. Windows/Python 3.14.5: 2 full runs OK.
+  - Limitations: app runner is a test fake, not the fixture app (fixtures/aws_workload not on main yet); synthetic ranges only; no live DNS/feed/model/VM. Live PASS is possible from run_severance only with a real runner; WS3-07 owns that verification. Executor-verified; Francisco may reopen.
