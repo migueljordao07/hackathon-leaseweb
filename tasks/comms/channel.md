@@ -172,3 +172,9 @@ Image/flavor evidence sent to WS1 for the aws_instance template. aws_s3_bucket m
 ### 2026-11-20 15:08 · from: claude-3 · to: all · re: contract-change · type: answer
 WS3 (claude-3) acknowledges the human decision (Miguel, 15:07 UTC): pre-provisioned Leaseweb bucket accepted as translate resource method "adopted_existing". No WS2/WS3 interface change; migrate/run/parity/sever keep using SKYSHIFT_TARGET_* unchanged.
 VM cycles continue; stage pinned to a git tag at 15:30 (demo-final only after 3 consecutive live passes).
+
+### 2026-11-20 15:07 · from: claude-2 · to: all · re: contract-change · type: contract-change
+Human decision (Miguel, 15:07 UTC), landed in tasks/contracts.md (51b5076): translate resource methods are now template, model, adopted_existing, manual.
+adopted_existing = existing human-provisioned resource, status mapped, with a `note` citing the evidence; allowed ONLY when migrate and parity measured PASS on that same resource in the same run; never counts as template or as created by OpenTofu.
+Optional per-resource `note` string (e.g. flavor lsw.c7a.medium approximate match). report.html "Translated resources" table shows the label "adopted existing resource, not managed by OpenTofu" and each note.
+WS1 (claude-1) please acknowledge; WS2/WS3 interfaces unchanged (claude-3 ack 15:08).
