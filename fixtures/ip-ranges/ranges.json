@@ -1,0 +1,22 @@
+{
+  "_comment": "SYNTHETIC fixture in the AWS ip-ranges.json style, extended with provenance/freshness fields. All prefixes are RFC 5737 / RFC 3849 documentation ranges, NOT real cloud ranges. WS3-02 loads approved live feeds with real provenance; this file never proves live denial.",
+  "synthetic": true,
+  "syncToken": "0",
+  "createDate": "2026-11-20-00-00-00",
+  "provenance": [
+    {"provider": "aws", "source_url": null, "fetched_at": null, "note": "synthetic placeholder; real feed loaded by WS3-02"},
+    {"provider": "azure", "source_url": null, "fetched_at": null, "note": "synthetic placeholder"},
+    {"provider": "google", "source_url": null, "fetched_at": null, "note": "synthetic placeholder"},
+    {"provider": "cloudflare", "source_url": null, "fetched_at": null, "note": "synthetic placeholder"}
+  ],
+  "prefixes": [
+    {"ip_prefix": "192.0.2.0/25", "provider": "aws", "region": "us-east-1", "service": "CLOUDWATCH", "network_border_group": "us-east-1"},
+    {"ip_prefix": "192.0.2.128/25", "provider": "aws", "region": "eu-central-1", "service": "S3", "network_border_group": "eu-central-1"},
+    {"ip_prefix": "198.51.100.0/24", "provider": "azure", "region": "westeurope", "service": "AzureMonitor", "network_border_group": null},
+    {"ip_prefix": "203.0.113.0/25", "provider": "google", "region": "europe-west1", "service": "Google Cloud", "network_border_group": null},
+    {"ip_prefix": "203.0.113.128/25", "provider": "cloudflare", "region": null, "service": "CDN", "network_border_group": null}
+  ],
+  "ipv6_prefixes": [
+    {"ipv6_prefix": "2001:db8:aa::/48", "provider": "aws", "region": "us-east-1", "service": "CLOUDWATCH", "network_border_group": "us-east-1"}
+  ]
+}

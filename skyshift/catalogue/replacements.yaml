@@ -1,0 +1,14 @@
+{
+  "_comment": "Replacement catalogue (WS3). Written in the JSON subset of YAML so the standard-library json module parses it; no PyYAML dependency. Remediation is configuration-only: the application code is never modified.",
+  "schema_version": 1,
+  "replacements": [
+    {
+      "id": "local-otel",
+      "matches": {"service": "telemetry", "providers": ["aws"], "hosts": ["monitoring.amazonaws.com"]},
+      "description": "Route application telemetry to a local OpenTelemetry-compatible receiver on the target VM instead of a US-controlled monitoring endpoint.",
+      "config": {"SKYSHIFT_TELEMETRY_ENDPOINT": "http://127.0.0.1:4318"},
+      "applied_config_keys": ["SKYSHIFT_TELEMETRY_ENDPOINT"],
+      "code_change": false
+    }
+  ]
+}

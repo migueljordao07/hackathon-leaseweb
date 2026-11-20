@@ -1,0 +1,28 @@
+{
+  "_comment": "SYNTHETIC replay fixture for skyshift.llm.complete (WS3-01). These are hand-written cached responses, not model output. Every completion served from here is labelled mode=replay. No secrets, private addresses or real endpoint data.",
+  "schema_version": 1,
+  "responses": {
+    "replacement_proposal": {
+      "data": {
+        "replacement_id": "local-otel",
+        "rationale": "Synthetic example: the blocked telemetry destination matches the replacement catalogue entry for telemetry; route it to the local OpenTelemetry receiver through configuration only.",
+        "config_keys": ["SKYSHIFT_TELEMETRY_ENDPOINT"]
+      }
+    },
+    "choose_explanation": {
+      "data": {
+        "text": "Synthetic example: Leaseweb is an EU-headquartered operator; storage mode follows the human-approved provider gate. Prices remain unverified until cited."
+      }
+    },
+    "parity_selection": {
+      "data": {
+        "operations": ["put_object", "get_object", "list_objects_v2"]
+      }
+    },
+    "report_narrative": {
+      "data": {
+        "text": "Synthetic example narrative. Verdicts, costs and hashes are computed deterministically elsewhere; this text does not certify sovereignty or DORA compliance."
+      }
+    }
+  }
+}
