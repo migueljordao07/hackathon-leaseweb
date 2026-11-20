@@ -1,0 +1,15 @@
+# Human decisions inbox
+
+Append-only questions/answers using channel.md format. Do not publish secrets or private access details; record availability only and arrange credential delivery privately. Only humans sign the VM go/switch gate. Humans can cut/reprioritize scope; reciprocal dependencies must be updated and validated.
+
+### 2026-11-20 12:01 · from: planner · to: humans · re: WS0-01 · type: request
+Please perform/sign the five-check 30-minute VM gate in tasks/WS0-setup/WS0-01-vm-validation.md; all checks currently NOT RUN.
+Confirm official Leaseweb provider versus OpenStack, target S3 availability, and credential availability without publishing values.
+Confirm EU-hosted model access/latency or labelled replay fallback; if fewer than four VM checks pass, approve Airlock replan.
+Confirm executor/human mapping in tasks/README.md and adjust scope to remaining time; timeline checkpoints are targets, not completed work.
+
+### 2026-11-20 12:20 · from: verifier · to: humans · re: planning-release · type: request
+Please approve/reprioritize the 26-task plan before implementation: its weighted DAG lower bound is 390 estimated minutes and all tasks are currently P0.
+Original before-lunch/14:00 milestones are not a feasible restart promise; select a reduced honestly incomplete/recorded demo or a separately approved Airlock replan if needed.
+Please confirm WS0 human operator, provider/schema, target storage, private access availability, model/replay route and approved range feeds; no VM check has run.
+Confirm mapping in REVIEW.md and who signs final rehearsals/backup/public release; keep all credential values outside Git.
