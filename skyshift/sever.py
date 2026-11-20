@@ -30,7 +30,10 @@ RANGES_FIXTURE = REPO_ROOT / "fixtures" / "ip-ranges" / "ranges.json"
 
 SEVER_DATA_KEYS = ("attempts", "max_attempts", "final", "radar_scope")
 FINAL_STATES = ("green", "blocked", "incomplete")
-RADAR_SCOPE = "socket detection only; proxy enforces requests using it"
+RADAR_SCOPE = (
+    "socket detection only; proxy enforces requests using it. Radar does not enforce; it samples TCP "
+    "sockets in this network namespace and misses short-lived, UDP/DNS and other-namespace traffic"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -695,6 +698,179 @@ class EgressProxy:
                 peers[sock].sendall(data)
 
 
+# ---------------------------------------------------------------------------
+# Socket radar (WS3-04) - DETECTION ONLY
+#
+# Snapshots TCP sockets from /proc/net/tcp{,6} (or a bounded ``ss -ntH``) and
+# reports outbound connections to non-loopback peers that the proxy did not
+# open. It never blocks, kills or changes anything. No process attribution is
+# collected (no ``ss -p``), so no command lines or environment leak.
+# ---------------------------------------------------------------------------
+
+RADAR_LIMITATIONS = (
+    "radar detects only and does not enforce network isolation",
+    "point-in-time snapshots: connections opened and closed between samples are missed",
+    "TCP only: UDP, DNS and ICMP are not observed",
+    "only the current network namespace is visible (other containers/VMs are not)",
+    "no process attribution: candidates may belong to unrelated host processes",
+    "loopback peers and inbound connections to listening ports are not reported",
+)
+RADAR_MAX_SAMPLES = 50
+RADAR_COMMAND_TIMEOUT = 3.0
+_TCP_STATES = {"01": "ESTABLISHED", "02": "SYN_SENT", "03": "SYN_RECV", "0A": "LISTEN"}
+_SS_STATES = {"ESTAB": "ESTABLISHED", "SYN-SENT": "SYN_SENT", "SYN-RECV": "SYN_RECV", "LISTEN": "LISTEN"}
+
+
+def _proc_address(text: str) -> tuple[str, int]:
+    """Decode a /proc/net/tcp{,6} ``HEXADDR:HEXPORT`` (little-endian 32-bit words)."""
+    addr_hex, port_hex = text.split(":")
+    port = int(port_hex, 16)
+    raw = bytes.fromhex(addr_hex)
+    if len(raw) not in (4, 16):
+        raise ValueError("bad address length")
+    swapped = b"".join(raw[i:i + 4][::-1] for i in range(0, len(raw), 4))
+    ip = ipaddress.ip_address(swapped)
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return str(ip), port
+
+
+def parse_proc_net_tcp(text: str, *, family: str = "tcp") -> tuple[list[dict], list[str]]:
+    """Parse /proc/net/tcp or tcp6 content into sockets plus sanitized parse errors."""
+    sockets, errors = [], []
+    for number, line in enumerate((text or "").splitlines()):
+        fields = line.split()
+        if not fields or fields[0] == "sl":
+            continue
+        try:
+            local_ip, local_port = _proc_address(fields[1])
+            remote_ip, remote_port = _proc_address(fields[2])
+            state = _TCP_STATES.get(fields[3].upper(), "OTHER")
+        except (IndexError, ValueError):
+            errors.append(f"{family}: unparsable line {number}")
+            continue
+        sockets.append({"local_ip": local_ip, "local_port": local_port, "remote_ip": remote_ip,
+                        "remote_port": remote_port, "state": state, "family": family})
+    return sockets, errors
+
+
+def _split_hostport(text: str) -> tuple[str, int]:
+    host, _, port = text.rpartition(":")
+    host = host.strip("[]").split("%", 1)[0]
+    ip = _normalise_address("0.0.0.0" if host == "*" else host)
+    return str(ip), 0 if port == "*" else int(port)
+
+
+def parse_ss(text: str) -> tuple[list[dict], list[str]]:
+    """Parse ``ss -ntH`` (State Recv-Q Send-Q Local Peer) output; process columns ignored."""
+    sockets, errors = [], []
+    for number, line in enumerate((text or "").splitlines()):
+        fields = line.split()
+        if not fields:
+            continue
+        try:
+            local_ip, local_port = _split_hostport(fields[3])
+            remote_ip, remote_port = _split_hostport(fields[4])
+        except (IndexError, ValueError):
+            errors.append(f"ss: unparsable line {number}")
+            continue
+        sockets.append({"local_ip": local_ip, "local_port": local_port, "remote_ip": remote_ip,
+                        "remote_port": remote_port, "state": _SS_STATES.get(fields[0].upper(), "OTHER"),
+                        "family": "ss"})
+    return sockets, errors
+
+
+def _default_radar_reader() -> tuple[list[dict], list[str]]:
+    """Read /proc/net/tcp{,6}; fall back to bounded ``ss -ntH``. Never raises."""
+    sockets, errors, read_any = [], [], False
+    for family in ("tcp", "tcp6"):
+        path = Path("/proc/net") / family
+        try:
+            text = path.read_text(encoding="ascii", errors="replace")
+        except OSError:
+            errors.append(f"{family}: /proc/net/{family} unreadable")
+            continue
+        read_any = True
+        found, bad = parse_proc_net_tcp(text, family=family)
+        sockets += found
+        errors += bad
+    if read_any:
+        return sockets, errors
+    import shutil
+    import subprocess
+
+    if shutil.which("ss") is None:
+        return [], errors + ["ss: command not available"]
+    try:
+        proc = subprocess.run(["ss", "-ntH"], capture_output=True, text=True, timeout=RADAR_COMMAND_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return [], errors + [f"ss: {type(exc).__name__}"]
+    if proc.returncode != 0:
+        return [], errors + [f"ss: exit {proc.returncode}"]
+    found, bad = parse_ss(proc.stdout)
+    return found, errors + bad
+
+
+def _is_local(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return addr.is_loopback or addr.is_unspecified
+
+
+def radar_scan(*, proxy_events: Iterable[dict] = (), reader: Callable[[], tuple] | None = None,
+               samples: int = 1, interval: float = 0.0) -> dict:
+    """Detect outbound TCP connections the proxy did not make. Detection only.
+
+    ``proxy_events`` are EgressProxy events; their allowed (ip, port) pairs are
+    the proxy's own upstream sockets. ``reader`` returns (sockets, errors) and
+    is injected in tests. Never raises for collection problems.
+    """
+    import time
+
+    if not isinstance(samples, int) or isinstance(samples, bool) or not 1 <= samples <= RADAR_MAX_SAMPLES:
+        raise ValueError(f"samples must be an integer from 1 to {RADAR_MAX_SAMPLES}")
+    read = reader or _default_radar_reader
+    proxied = {(e.get("ip"), e.get("port")) for e in proxy_events or []
+               if isinstance(e, dict) and e.get("decision") == "allow"}
+    errors: list[str] = []
+    seen: dict[tuple, dict] = {}
+    observed = 0
+    successful = 0
+    for index in range(samples):
+        try:
+            sockets, sample_errors = read()
+        except Exception as exc:  # noqa: BLE001 - collection failures are evidence, not crashes
+            sockets, sample_errors = [], [f"reader failed: {type(exc).__name__}"]
+        errors += [e for e in sample_errors if e not in errors]
+        if sockets or not sample_errors:
+            successful += 1
+        listening = {s["local_port"] for s in sockets if s.get("state") == "LISTEN"}
+        for sock in sockets:
+            if sock.get("state") not in ("ESTABLISHED", "SYN_SENT"):
+                continue
+            observed += 1
+            remote = (sock["remote_ip"], sock["remote_port"])
+            if _is_local(sock["remote_ip"]) or sock["local_port"] in listening or remote in proxied:
+                continue
+            seen.setdefault(remote, {"ip": remote[0], "port": remote[1], "state": sock["state"],
+                                     "family": sock.get("family"), "via": "radar",
+                                     "reason": "outbound TCP not opened by the proxy (detected, not blocked)"})
+        if interval and index + 1 < samples:
+            time.sleep(min(interval, 1.0))
+    coverage = "unavailable" if successful == 0 else "partial"
+    return {
+        "enforces": False,
+        "coverage": coverage,
+        "samples": samples,
+        "observed_connections": observed,
+        "bypasses": sorted(seen.values(), key=lambda b: (b["ip"], b["port"])),
+        "collection_errors": errors,
+        "limitations": list(RADAR_LIMITATIONS),
+    }
+
+
 def _envelope(mode: str, status: str, checks: list, data: dict, errors: list) -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
@@ -836,7 +1012,8 @@ def sever(data_map: dict, target: dict, *, config: dict, max_attempts: int = 2, 
         {
             "id": "radar_bypass_detection",
             "status": "incomplete",
-            "detail": "not implemented (WS3-04); no socket inspection performed",
+            "detail": "radar_scan exists (WS3-04) but sever() does not run it until WS3-05; nothing measured. "
+            "Detection only, never enforcement",
         },
         {
             "id": "config_only_replacement_retry",
