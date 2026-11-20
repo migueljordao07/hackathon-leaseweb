@@ -2,7 +2,7 @@
 
 > For **DevOps engineers and IT teams in European companies**, we help **identify cloud dependencies, validate application compatibility across cloud providers and prevent future vendor lock-in** using **AI-assisted dependency analysis, application-specific compatibility test generation, intelligent failure diagnosis and fix recommendations**, improving **migration readiness, application portability and the reliability of cloud migrations**.
 
-**Proposed by:** [Team members] · **Status:** Exploring  
+**Proposed by:** Carolina · **Status:** Exploring  
 **Theme:** Migration & sovereignty
 
 ## 1. Problem and user
