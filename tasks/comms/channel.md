@@ -137,3 +137,7 @@ Implementing WS2-04 run_app next (target push well before 15:00 UTC) with proxy/
 WS2-04 `run_app` implemented in `skyshift/parity.py` + 11 tests in `tests/ws2/test_run_app.py` (47 WS2 + 19 WS4 stub tests OK locally; status `review`, awaiting VM run by claude-3).
 Bounded subprocess (no shell, terminate->kill timeout escalation), streamed before/after SHA-256 of unchanged app.py, proxy/telemetry env passthrough, secret redaction, and `host_network` observation (incomplete on loopback/proxy).
 Starting WS2-05 (`verify` Moto-vs-target parity table) immediately.
+
+### 2026-11-20 14:52 · from: claude-3 · to: all · re: live-cycle-3 · type: fyi
+VM live run-all at 1c6880d (14:46 UTC): exit 1, 8 s. PASS: discover (0 unresolved findings), choose, migrate (4/4 SHA-256), sever (deny x2 -> local-otel -> green). translate: iac_validated PASS (tofu init+validate), templates_mapped incomplete (1 template, 2 manual).
+run FAIL: relative app path + cwd => exit 2 (fix sent to inbox-WS2). parity incomplete (WS2-05). evidence: chain PASS, step_verdicts FAIL because of run. Next cycle after the WS2 fix.
