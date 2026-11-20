@@ -2,7 +2,7 @@
 id: WS2-02
 title: Reproducible AWS workload and seed fixture
 workstream: WS2
-status: claimed
+status: review
 owner: gemini
 priority: P0
 depends_on: [WS2-01]
@@ -10,7 +10,7 @@ blocks: [WS2-03, WS2-04]
 files: [fixtures/aws_workload/main.tf, fixtures/aws_workload/app.py, fixtures/aws_workload/seed_data/customer-001.json, fixtures/aws_workload/seed_data/customer-002.json, fixtures/aws_workload/seed_data/readme.txt, fixtures/aws_workload/seed_data/multipart.bin, tests/ws2/test_fixture.py]
 estimate: 45m
 claimed_at: "2026-11-20T12:49:52+00:00"
-updated_at: "2026-11-20T12:49:52+00:00"
+updated_at: "2026-11-20T12:57:20+00:00"
 ---
 
 ## Goal
@@ -55,3 +55,5 @@ If OpenTofu is absent, retain static fixture tests and defer real validation to 
 
 - 2026-11-20 12:07 UTC — Planned fixture only. AWS, OpenTofu, and VM behavior remain unverified.
 - 2026-11-20T12:49:52+00:00 — Claimed by gemini. Re-read channel.md and inbox-WS2.md after WS2-01 landed. Implementation starts after claim push is accepted.
+- 2026-11-20T12:57:20+00:00 — Implemented synthetic workload fixture: `fixtures/aws_workload/main.tf` (exact 3 AWS resources: `aws_instance.app`, `aws_security_group.app`, `aws_s3_bucket.demo`, RFC 5737 `192.0.2.0/24` CIDR, synthetic defaults only), unchanged baseline `fixtures/aws_workload/app.py` (import-safe, contract-only env vars, bounded timeouts 3s/5s/1 attempt, S3 put/get/list/multipart, CloudWatch `put_metric_data` defaulting to `https://monitoring.eu-central-1.amazonaws.com` and overridable via `SKYSHIFT_TELEMETRY_ENDPOINT`), 4 deterministic seed files (`customer-001.json` 147B `c1ae14a8...`, `customer-002.json` 144B `4c27c678...`, `readme.txt` 166B `e36d52a4...`, `multipart.bin` 131072B `fd90a13f...`), and offline tests `tests/ws2/test_fixture.py`.
+- 2026-11-20T12:57:20+00:00 — Review acceptance: `python -B -m unittest discover -s tests/ws2 -v` 23 tests OK (11 fixture + 12 stub) on Windows 11 / Python 3.14.5 and on WSL2 Ubuntu (Linux 6.6.87.2-microsoft-standard-WSL2) / Python 3.12.3; `app.py` SHA-256 identical before and after functional tests (`71dd360d6193a1b1464da29c761160664c88143617eb31f06c48710607cef4ed`, LF). `skyshift.discover.scan_python` cleanly detects all S3 calls and `cloudwatch.put_metric_data` on `monitoring.eu-central-1.amazonaws.com` with 0 findings. `python tasks/board.py --check` OK. Limitations: `tofu` is not installed on Windows or WSL2 so `tofu fmt -check fixtures/aws_workload/main.tf` was NOT RUN (deferred to VM/WS0 gate); dotted `tests.ws2.test_fixture` waits on WS4 `tests/__init__.py`; no AWS, Moto, target storage, or VM validation performed.

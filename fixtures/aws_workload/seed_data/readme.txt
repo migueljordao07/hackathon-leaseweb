@@ -1,0 +1,1 @@
+Synthetic SkyShift WS2 seed dataset for deterministic S3 migration, SHA-256 verification, and parity testing. Contains no production data, credentials, or timestamps.
