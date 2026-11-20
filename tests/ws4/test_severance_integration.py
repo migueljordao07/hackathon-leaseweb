@@ -39,6 +39,24 @@ class SeveranceReportTest(unittest.TestCase):
         self.assertNotIn("<b>amazonaws", html)
         self.assertIn("not proof of zero leakage", html)
 
+    def test_report_labels_adopted_existing_and_notes(self):
+        translate = dict(cli.EMPTY_DATA["translate"])
+        translate["resources"] = [
+            {"source_id": "aws_s3_bucket.demo", "target_type": "leaseweb_object_storage",
+             "method": "adopted_existing", "status": "mapped", "manual_reason": None,
+             "note": "migrate+parity PASS on this bucket"},
+            {"source_id": "aws_instance.app", "target_type": "openstack_compute_instance_v2",
+             "method": "template", "status": "mapped", "manual_reason": None,
+             "note": "flavor lsw.c7a.medium is the smallest available, not an exact <match>"}]
+        records = [_record(s) for s in ("discover", "choose")] + [_record("translate", translate)]
+        records += [_record(s) for s in ("migrate", "run", "parity")] + [_record("sever", SEVER)]
+        with tempfile.TemporaryDirectory() as tmp:
+            evidence.build_evidence(records, output_dir=Path(tmp), config={})
+            html = (Path(tmp) / evidence.REPORT_NAME).read_text(encoding="utf-8")
+        self.assertIn("adopted existing resource, not managed by OpenTofu", html)
+        self.assertIn("lsw.c7a.medium", html)
+        self.assertIn("&lt;match&gt;", html)
+
     def test_missing_attempts_render_placeholder(self):
         records = [_record(s) for s in cli.STEPS[:-1]]
         with tempfile.TemporaryDirectory() as tmp:

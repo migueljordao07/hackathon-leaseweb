@@ -232,6 +232,41 @@ def render(template: str, values: dict[str, str]) -> str:
     return _PLACEHOLDER.sub(substitute, template)
 
 
+METHOD_LABELS = {
+    "template": "template (OpenTofu)",
+    "model": "model-proposed (OpenTofu)",
+    "adopted_existing": "adopted existing resource, not managed by OpenTofu",
+    "manual": "manual action needed",
+}
+NOTE_KEYS = ("note", "notes", "flavor_note", "manual_reason")
+
+
+def _translate_section(records: list[dict]) -> str:
+    """Escaped rows for every translated resource with its method label and notes."""
+    record = next((r for r in records if isinstance(r, dict) and r.get("step") == "translate"),
+                  None)
+    data = record.get("data") if isinstance(record, dict) else None
+    resources = data.get("resources") if isinstance(data, dict) else None
+    rows = []
+    for res in resources if isinstance(resources, list) else []:
+        if not isinstance(res, dict):
+            continue
+        method = res.get("method")
+        label = METHOD_LABELS.get(method, str(method))
+        notes = []
+        for key in NOTE_KEYS:
+            value = res.get(key)
+            if isinstance(value, list):
+                value = "; ".join(str(v) for v in value)
+            if value and str(value) not in notes:
+                notes.append(str(value))
+        rows.append(
+            f"<tr><td>{_e(res.get('source_id'))}</td><td>{_e(res.get('target_type'))}</td>"
+            f"<td>{_e(label)}</td><td>{_e(res.get('status'))}</td>"
+            f"<td>{_e(' | '.join(notes) or '-')}</td></tr>")
+    return "\n".join(rows) or "<tr><td colspan=\"5\">no translated resources recorded</td></tr>"
+
+
 def _sever_section(records: list[dict]) -> tuple[str, str, str]:
     """Escaped rows for every severance attempt, preserving red -> fix -> green history."""
     sever = next((r for r in records if isinstance(r, dict) and r.get("step") == "sever"), None)
@@ -296,6 +331,7 @@ def render_report(records: list[dict], evidence: dict, *, stub: bool,
                 f"{_status_cell(check.get('status'))}<td>{_e(check.get('detail'))}</td></tr>")
     open_items = "".join(f"<li>{_e(item)}</li>" for item in data["open_items"])
     sever_final, sever_scope, sever_rows = _sever_section(records)
+    translate_rows = _translate_section(records)
 
     values = {
         "banner": _e(banner),
@@ -311,6 +347,7 @@ def render_report(records: list[dict], evidence: dict, *, stub: bool,
         "sever_final": _e(sever_final),
         "sever_scope": _e(sever_scope),
         "sever_rows": sever_rows,
+        "translate_rows": translate_rows,
     }
     return render(Path(template_path).read_text(encoding="utf-8"), values)
 

@@ -92,7 +92,7 @@ Only Leaseweb choices; deterministic selection uses human-approved provider avai
 {"provider":"openstack","files":["out/iac/main.tf"],"resources":[{"source_id":"aws_s3_bucket.demo","target_type":"self_hosted_s3","method":"template","status":"mapped","manual_reason":null}],"validation":{"method":"tofu","init_exit":0,"validate_exit":0,"attempts":1,"diagnostics":[]}}
 ```
 
-Resource method: template, model, manual. Status: mapped, manual. Known mappings: aws_instance, aws_security_group, aws_s3_bucket. Templates first; schema-constrained AI only for gaps; at most one correction after validation failure. Unresolved resources remain visible as manual. Offline schema validation uses method `offline_schema`, nullable exit codes, and incomplete overall status, never claims `tofu validate` ran. No automatic apply in P0.
+Resource method: template, model, adopted_existing, manual. Status: mapped, manual. `adopted_existing` (human decision, Miguel, 15:07 UTC) marks an existing, human-provisioned target resource; it is allowed only when migrate and parity measured PASS on that same resource in the same run, uses status mapped, carries a `note` with the evidence, and never counts as `template` or as created by OpenTofu. Optional per-resource `note` (string) carries sanitized operator notes such as an approximate flavor match. Known mappings: aws_instance, aws_security_group, aws_s3_bucket. Templates first; schema-constrained AI only for gaps; at most one correction after validation failure. Unresolved resources remain visible as manual. Offline schema validation uses method `offline_schema`, nullable exit codes, and incomplete overall status, never claims `tofu validate` ran. No automatic apply in P0.
 
 ### Migration (`migrate.data`)
 
