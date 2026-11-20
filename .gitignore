@@ -1,0 +1,5 @@
+# Local, personal rules (not shared)
+local-rules.md
+
+# Secrets
+.env
