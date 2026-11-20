@@ -44,3 +44,10 @@ Result: **PASS**. Limitation: enforces only clients honouring HTTPS_PROXY (no fi
 ## Human decision
 
 go-with-fallback (4/5). Checks 1, 2, 3 (init/validate) and 5 PASS; check 4 NOT RUN, labelled replay fallback tested. Authenticated tofu plan FAIL recorded as a limitation (customer ID missing). Signed: Miguel Jordão, 2026-11-20 14:20 UTC.
+
+## Addendum: check 4 re-run live (after the signed decision)
+
+Agent `claude-3`, 14:19–14:24 UTC. The signed decision above is unchanged; this records a later live measurement for human review.
+Server: the supplied "GPU server" has **no GPU** (`lspci`: only a virtual Cirrus Logic VGA; 0 NVIDIA devices), so no NVIDIA driver was installed. It is a 48 vCPU AMD EPYC VM with 188 GiB RAM, Ubuntu 26.04.1. Ollama 0.40.16 installed, bound to 127.0.0.1:11434 only (systemd drop-in); reached from the demo VM through an SSH local-forward tunnel (no public model port).
+Models (CPU inference): `mistral:7b` -> both requests timed out at the client's 20 s bound, labelled replay served: FAIL for latency. `qwen2.5:3b` -> `skyshift.llm.complete` live, three resources (aws_instance, aws_security_group, aws_s3_bucket) mapped to enumerated target types, schema-valid (client validator and jsonschema): 9.42 s first request, then 6.31 s, 6.62 s, 6.22 s; mode=live, status=ok, errors=[].
+Result: **check 4 PASS with `qwen2.5:3b` on CPU** (latency < 10 s; the first request after model load was close to the bound). Limitation: small 3B model on CPU, not GPU, not Mistral 7B; Leaseweb-hosted in the EU per supplied server, jurisdiction not independently verified. Fallback unchanged: labelled replay.
