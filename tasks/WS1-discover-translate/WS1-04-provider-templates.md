@@ -2,15 +2,15 @@
 id: WS1-04
 title: Render known AWS resources into approved provider templates
 workstream: WS1
-status: todo
-owner: null
+status: in_progress
+owner: claude-1
 priority: P0
 depends_on: [WS1-03, WS0-01]
 blocks: [WS1-05]
 files: [skyshift/translate.py, skyshift/catalogue/resources.yaml, skyshift/templates/iac/compute.tf.j2, skyshift/templates/iac/network.tf.j2, skyshift/templates/iac/storage.tf.j2, skyshift/templates/iac/provider.tf.j2, skyshift/templates/iac/provider-schema.json, tests/ws1/test_templates.py]
 estimate: 50m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T14:35:00+00:00"
+updated_at: "2026-11-20T14:35:00+00:00"
 ---
 
 ## Goal
@@ -45,3 +45,4 @@ Human-approved offline schema mode is incomplete with null tofu exit codes; reta
 
 ## Log
 - 2026-11-20: Planned only. Provider schema and all VM/OpenTofu execution remain unverified; gate remains human-only.
+- 2026-11-20 14:35 UTC: Claimed by claude-1 under SPEED MODE (Miguel 14:30; WS1-03/04/05 claimed together, deps WS0-01/WS1-02 done per human decision).

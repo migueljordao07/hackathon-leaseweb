@@ -2,15 +2,15 @@
 id: WS1-05
 title: Validate IaC with bounded schema-constrained AI repair
 workstream: WS1
-status: todo
-owner: null
+status: in_progress
+owner: claude-1
 priority: P0
 depends_on: [WS1-04, WS3-01]
 blocks: [WS4-05]
 files: [skyshift/translate.py, tests/ws1/test_validation.py, tests/ws1/test_pipeline.py]
 estimate: 50m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T14:35:00+00:00"
+updated_at: "2026-11-20T14:35:00+00:00"
 ---
 
 ## Goal
@@ -44,3 +44,4 @@ Keep deterministic templates and labelled offline_schema/incomplete records when
 
 ## Log
 - 2026-11-20: Planned only; no product implementation, provider execution or live model acceptance performed.
+- 2026-11-20 14:35 UTC: Claimed by claude-1 under SPEED MODE (Miguel 14:30; WS1-03/04/05 claimed together, deps WS0-01/WS1-02 done per human decision).

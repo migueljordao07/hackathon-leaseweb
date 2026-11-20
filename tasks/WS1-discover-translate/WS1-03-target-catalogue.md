@@ -2,15 +2,15 @@
 id: WS1-03
 title: Choose a verified Leaseweb target with cited criteria
 workstream: WS1
-status: todo
-owner: null
+status: in_progress
+owner: claude-1
 priority: P0
 depends_on: [WS1-02]
 blocks: [WS1-04]
 files: [skyshift/discover.py, skyshift/catalogue/targets.yaml, tests/ws1/test_choice.py]
 estimate: 30m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T14:35:00+00:00"
+updated_at: "2026-11-20T14:35:00+00:00"
 ---
 
 ## Goal
@@ -42,3 +42,4 @@ Retain null prices and an explicit unverified criterion when a source cannot be 
 
 ## Log
 - 2026-11-20: Planned only; provider, storage availability and public prices remain unverified until execution.
+- 2026-11-20 14:35 UTC: Claimed by claude-1 under SPEED MODE (Miguel 14:30; WS1-03/04/05 claimed together, deps WS0-01/WS1-02 done per human decision).
