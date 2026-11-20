@@ -37,6 +37,47 @@ TARGET_KEYS = (
 )
 
 REQUIRED_PARITY_OPERATIONS = ("put_object", "get_object", "list_objects_v2")
+KNOWN_PARITY_OPERATIONS = (
+    "put_object",
+    "get_object",
+    "list_objects_v2",
+    "head_object",
+    "multipart_upload",
+    "presigned_url",
+    "delete_object",
+)
+PARITY_SELECTION_SCHEMA = {
+    "type": "object",
+    "required": ["operations"],
+    "additionalProperties": False,
+    "properties": {
+        "operations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {"type": "string", "enum": list(KNOWN_PARITY_OPERATIONS)},
+        }
+    },
+}
+_AST_OP_MAP = {
+    "put_object": "put_object",
+    "get_object": "get_object",
+    "list_objects_v2": "list_objects_v2",
+    "list_objects": "list_objects_v2",
+    "head_object": "head_object",
+    "delete_object": "delete_object",
+    "create_multipart_upload": "multipart_upload",
+    "upload_part": "multipart_upload",
+    "complete_multipart_upload": "multipart_upload",
+    "abort_multipart_upload": "multipart_upload",
+    "multipart_upload": "multipart_upload",
+    "generate_presigned_url": "presigned_url",
+    "presigned_url": "presigned_url",
+}
+_PARITY_SMOKE_PAYLOAD = b'{"parity":"skyshift","synthetic":true,"version":1}'
+_PARITY_MULTIPART_RECORDS = 1024
+_PARITY_STREAM_CHUNK = 16384
+_PARITY_HTTP_TIMEOUT = 10.0
 
 # Deterministic 64-character lowercase hex placeholder (synthetic, not measured).
 _STUB_APP_SHA256 = "b2c3d4e5" * 8
@@ -188,8 +229,8 @@ def _sha256_file(path: Path) -> str | None:
 def _resolve_app_path(workload: Path) -> Path:
     path = Path(workload)
     if path.is_file():
-        return path
-    return path / "app.py"
+        return path.resolve()
+    return (path / "app.py").resolve()
 
 
 def _build_child_env(
@@ -355,7 +396,7 @@ def _observe_host_network(target_endpoint: str, target: dict, config: dict) -> d
         "interface_scope": interface_scope,
         "limitations": limitations,
         "detail": (
-            f"target host {hostname} resolved to public global endpoint "
+            f"configured target endpoint ({operator}) resolved to public global IP "
             f"(interface_scope={interface_scope}); {limitations}"
         ),
     }
@@ -550,8 +591,8 @@ def _live_run_app(
         "changed": bool(target_host and target_host != source_host),
         "config_only": True,
         "env_var": "AWS_ENDPOINT_URL",
-        "source_identity": source_host or "aws-s3-default",
-        "target_identity": target_host or target_identity,
+        "source_identity": "local-moto-source" if (source_host and _is_loopback_host(source_host.split(":")[0])) else ("configured-source" if source_host else "aws-s3-default"),
+        "target_identity": target_identity,
     }
 
     if missing_cfg or not app_path.is_file():
@@ -884,27 +925,686 @@ def verify(data_map: dict, target: dict, *, config: dict, stub: bool = False) ->
         ]
         return _envelope("parity", "stub", "incomplete", checks, data, [])
 
-    data = {
-        "operations": [],
-        "selection": {
-            "source": "unimplemented",
-            "operations": [],
-            "ai_mode": "replay",
-            "detail": "live parity suite not implemented yet (WS2-05)",
-        },
+    return _live_verify(data_map, target, config=config)
+
+
+# ---------------------------------------------------------------------------
+# Live Moto-before vs target-after parity suite (WS2-05)
+# ---------------------------------------------------------------------------
+
+
+def _parity_multipart_payload() -> bytes:
+    """Deterministically build the 128 KiB synthetic multipart parity payload."""
+    blocks = []
+    for index in range(_PARITY_MULTIPART_RECORDS):
+        header = f"SKYSHIFT-PARITY-{index:04d}:".encode("ascii")
+        body = bytes(((index * 29 + offset) % 256) for offset in range(104))
+        blocks.append(header + body + b"\n")
+    return b"".join(blocks)
+
+
+def _stream_body_sha256(body: Any, chunk_size: int = _PARITY_STREAM_CHUNK) -> tuple[str, int]:
+    digest = hashlib.sha256()
+    total = 0
+    try:
+        while True:
+            chunk = body.read(chunk_size)
+            if not chunk:
+                break
+            digest.update(chunk)
+            total += len(chunk)
+    finally:
+        close_fn = getattr(body, "close", None)
+        if callable(close_fn):
+            close_fn()
+    return digest.hexdigest(), total
+
+
+def _s3_side_config(config: dict, ns: str) -> dict[str, str] | None:
+    side = {
+        "endpoint": _nonempty_str(config.get(f"{ns}_ENDPOINT_URL")),
+        "key": _nonempty_str(config.get(f"{ns}_ACCESS_KEY_ID")),
+        "secret": _nonempty_str(config.get(f"{ns}_SECRET_ACCESS_KEY")),
+        "bucket": _nonempty_str(config.get(f"{ns}_BUCKET")),
+        "region": _nonempty_str(config.get("AWS_DEFAULT_REGION")) or "eu-central-1",
     }
-    checks = [
-        {
-            "id": "parity_suite",
-            "status": "incomplete",
-            "detail": "live parity verification not implemented yet (WS2-05); no Moto or target run",
+    if not all(side[k] for k in ("endpoint", "key", "secret", "bucket")):
+        return None
+    return side  # type: ignore[return-value]
+
+
+def _build_s3_client(side: dict[str, str]) -> Any:
+    import boto3  # lazy: importing skyshift.parity must not import boto3
+    from botocore.config import Config
+
+    return boto3.client(
+        "s3",
+        endpoint_url=side["endpoint"],
+        aws_access_key_id=side["key"],
+        aws_secret_access_key=side["secret"],
+        region_name=side["region"],
+        config=Config(
+            signature_version="s3v4",
+            s3={"addressing_style": "path"},
+            connect_timeout=5,
+            read_timeout=15,
+            retries={"max_attempts": 1, "mode": "standard"},
+        ),
+    )
+
+
+def _sanitize_exc(exc: BaseException, config: dict) -> str:
+    code = None
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        code = (response.get("Error") or {}).get("Code")
+    label = f"{type(exc).__name__}" + (
+        f" ({code})" if isinstance(code, str) and code.isalnum() else ""
+    )
+    return _sanitize_text(label, config)
+
+
+def _select_parity_operations(
+    data_map: dict,
+    *,
+    config: dict,
+    llm_complete: Callable[..., dict] | None = None,
+) -> dict[str, Any]:
+    """Deterministically build required operations and safely merge optional AI proposals."""
+    required: set[str] = set(REQUIRED_PARITY_OPERATIONS)
+    detected_raw: list[str] = []
+    for call in data_map.get("calls") or []:
+        if not isinstance(call, dict):
+            continue
+        if str(call.get("service") or "").lower() != "s3":
+            continue
+        op_name = _nonempty_str(call.get("operation"))
+        if not op_name:
+            continue
+        detected_raw.append(op_name)
+        mapped = _AST_OP_MAP.get(op_name)
+        if mapped:
+            required.add(mapped)
+
+    ai_mode = "replay"
+    ai_status = "incomplete"
+    rejected: list[str] = []
+    proposed_valid: set[str] = set()
+
+    proposer = llm_complete
+    if proposer is None:
+        try:
+            from skyshift.llm import complete as _default_complete
+
+            proposer = _default_complete
+        except Exception:  # noqa: BLE001
+            proposer = None
+
+    if proposer is not None:
+        payload = {
+            "required_operations": [op for op in KNOWN_PARITY_OPERATIONS if op in required],
+            "detected_s3_calls": sorted(set(detected_raw)),
+            "known_operations": list(KNOWN_PARITY_OPERATIONS),
         }
-    ]
+        try:
+            res = proposer("parity_selection", payload, PARITY_SELECTION_SCHEMA, config=config)
+        except Exception:  # noqa: BLE001 - advisory only
+            res = None
+        if isinstance(res, dict):
+            mode_val = res.get("mode")
+            if mode_val in ("live", "replay"):
+                ai_mode = mode_val
+            status_val = res.get("status")
+            if status_val in ("ok", "incomplete"):
+                ai_status = status_val
+            proposed_data = res.get("data")
+            if isinstance(proposed_data, dict) and isinstance(proposed_data.get("operations"), list):
+                for item in proposed_data["operations"]:
+                    if isinstance(item, str) and item in KNOWN_PARITY_OPERATIONS:
+                        proposed_valid.add(item)
+                    else:
+                        rejected.append(_sanitize_text(str(item), config))
+            elif status_val == "ok":
+                ai_status = "incomplete"
+
+    final_set = required | proposed_valid
+    ordered = [op for op in KNOWN_PARITY_OPERATIONS if op in final_set]
+    return {
+        "source": "ast+required",
+        "operations": ordered,
+        "required_operations": [op for op in KNOWN_PARITY_OPERATIONS if op in required],
+        "ai_mode": ai_mode,
+        "ai_status": ai_status,
+        "rejected_proposals": rejected,
+    }
+
+
+def _default_http_get(url: str, timeout: float = _PARITY_HTTP_TIMEOUT) -> tuple[int, bytes]:
+    import urllib.request  # lazy: importing skyshift.parity must not import urllib.request
+
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https"):
+        raise ValueError("presigned URL must use http or https")
+    req = urllib.request.Request(url, method="GET")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - scheme validated
+        status = getattr(resp, "status", 200)
+        chunks = []
+        total = 0
+        while True:
+            chunk = resp.read(_PARITY_STREAM_CHUNK)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > 4 * 1024 * 1024:
+                raise ValueError("presigned response exceeded size limit")
+            chunks.append(chunk)
+        return int(status), b"".join(chunks)
+
+
+def _execute_parity_suite(
+    client: Any,
+    bucket: str,
+    operations: list[str],
+    *,
+    prefix: str,
+    config: dict,
+    side_label: str,
+    http_get: Callable[[str, float], tuple[int, bytes]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Run identical S3 parity operations on one side and clean up ONLY created synthetic keys."""
+    clean_prefix = prefix.strip("/") + "/"
+    smoke_key = f"{clean_prefix}smoke.json"
+    multipart_key = f"{clean_prefix}multipart.bin"
+    delete_key = f"{clean_prefix}delete-probe.txt"
+
+    smoke_sha256 = hashlib.sha256(_PARITY_SMOKE_PAYLOAD).hexdigest()
+    multipart_payload = _parity_multipart_payload()
+    multipart_sha256 = hashlib.sha256(multipart_payload).hexdigest()
+
+    created_keys: set[str] = set()
+    results: dict[str, dict[str, Any]] = {}
+    getter = http_get or _default_http_get
+
+    try:
+        for op in operations:
+            if op == "put_object":
+                try:
+                    client.put_object(
+                        Bucket=bucket,
+                        Key=smoke_key,
+                        Body=_PARITY_SMOKE_PAYLOAD,
+                        ContentType="application/json",
+                    )
+                    created_keys.add(smoke_key)
+                    results[op] = {
+                        "status": "PASS",
+                        "detail": f"{side_label}: put {len(_PARITY_SMOKE_PAYLOAD)} bytes",
+                        "signature": {"bytes": len(_PARITY_SMOKE_PAYLOAD), "sha256": smoke_sha256},
+                    }
+                except Exception as exc:  # noqa: BLE001
+                    results[op] = {
+                        "status": "FAIL",
+                        "detail": f"{side_label}: put_object failed ({_sanitize_exc(exc, config)})",
+                        "signature": None,
+                    }
+
+            elif op == "get_object":
+                try:
+                    resp = client.get_object(Bucket=bucket, Key=smoke_key)
+                    got_sha, got_bytes = _stream_body_sha256(resp["Body"])
+                    if got_sha == smoke_sha256 and got_bytes == len(_PARITY_SMOKE_PAYLOAD):
+                        results[op] = {
+                            "status": "PASS",
+                            "detail": f"{side_label}: read {got_bytes} bytes SHA-256 verified",
+                            "signature": {"bytes": got_bytes, "sha256": got_sha},
+                        }
+                    else:
+                        results[op] = {
+                            "status": "FAIL",
+                            "detail": f"{side_label}: get_object content/hash mismatch",
+                            "signature": {"bytes": got_bytes, "sha256": got_sha},
+                        }
+                except Exception as exc:  # noqa: BLE001
+                    results[op] = {
+                        "status": "FAIL",
+                        "detail": f"{side_label}: get_object failed ({_sanitize_exc(exc, config)})",
+                        "signature": None,
+                    }
+
+            elif op == "list_objects_v2":
+                try:
+                    found_keys: list[str] = []
+                    token = None
+                    pages = 0
+                    while True:
+                        pages += 1
+                        if pages > 100:
+                            raise ValueError("pagination bound exceeded")
+                        kwargs: dict[str, Any] = {"Bucket": bucket, "Prefix": clean_prefix}
+                        if token:
+                            kwargs["ContinuationToken"] = token
+                        page = client.list_objects_v2(**kwargs)
+                        for item in page.get("Contents") or []:
+                            if "Key" in item:
+                                found_keys.append(item["Key"])
+                        if page.get("IsTruncated"):
+                            token = page.get("NextContinuationToken")
+                            if not token:
+                                raise ValueError("truncated listing without continuation token")
+                        else:
+                            break
+                    found = smoke_key in found_keys
+                    if found:
+                        results[op] = {
+                            "status": "PASS",
+                            "detail": f"{side_label}: listed {len(found_keys)} key(s) under synthetic prefix",
+                            "signature": {"smoke_key_found": True},
+                        }
+                    else:
+                        results[op] = {
+                            "status": "FAIL",
+                            "detail": f"{side_label}: synthetic smoke key missing from listing",
+                            "signature": {"smoke_key_found": False},
+                        }
+                except Exception as exc:  # noqa: BLE001
+                    results[op] = {
+                        "status": "FAIL",
+                        "detail": f"{side_label}: list_objects_v2 failed ({_sanitize_exc(exc, config)})",
+                        "signature": None,
+                    }
+
+            elif op == "head_object":
+                try:
+                    resp = client.head_object(Bucket=bucket, Key=smoke_key)
+                    length = int(resp.get("ContentLength", -1))
+                    if length == len(_PARITY_SMOKE_PAYLOAD):
+                        results[op] = {
+                            "status": "PASS",
+                            "detail": f"{side_label}: head_object ContentLength={length}",
+                            "signature": {"content_length": length},
+                        }
+                    else:
+                        results[op] = {
+                            "status": "FAIL",
+                            "detail": f"{side_label}: head_object length mismatch ({length})",
+                            "signature": {"content_length": length},
+                        }
+                except Exception as exc:  # noqa: BLE001
+                    results[op] = {
+                        "status": "FAIL",
+                        "detail": f"{side_label}: head_object failed ({_sanitize_exc(exc, config)})",
+                        "signature": None,
+                    }
+
+            elif op == "multipart_upload":
+                upload_id: str | None = None
+                try:
+                    created = client.create_multipart_upload(
+                        Bucket=bucket,
+                        Key=multipart_key,
+                        ContentType="application/octet-stream",
+                    )
+                    upload_id = created["UploadId"]
+                    part = client.upload_part(
+                        Bucket=bucket,
+                        Key=multipart_key,
+                        UploadId=upload_id,
+                        PartNumber=1,
+                        Body=multipart_payload,
+                    )
+                    client.complete_multipart_upload(
+                        Bucket=bucket,
+                        Key=multipart_key,
+                        UploadId=upload_id,
+                        MultipartUpload={"Parts": [{"ETag": part["ETag"], "PartNumber": 1}]},
+                    )
+                    upload_id = None
+                    created_keys.add(multipart_key)
+                    resp = client.get_object(Bucket=bucket, Key=multipart_key)
+                    got_sha, got_bytes = _stream_body_sha256(resp["Body"])
+                    if got_sha == multipart_sha256 and got_bytes == len(multipart_payload):
+                        results[op] = {
+                            "status": "PASS",
+                            "detail": f"{side_label}: multipart upload verified ({got_bytes} bytes)",
+                            "signature": {"bytes": got_bytes, "sha256": got_sha},
+                        }
+                    else:
+                        results[op] = {
+                            "status": "FAIL",
+                            "detail": f"{side_label}: multipart readback SHA-256 mismatch",
+                            "signature": {"bytes": got_bytes, "sha256": got_sha},
+                        }
+                except Exception as exc:  # noqa: BLE001
+                    if upload_id is not None:
+                        try:
+                            client.abort_multipart_upload(
+                                Bucket=bucket,
+                                Key=multipart_key,
+                                UploadId=upload_id,
+                            )
+                        except Exception:  # noqa: BLE001
+                            pass
+                    results[op] = {
+                        "status": "FAIL",
+                        "detail": f"{side_label}: multipart_upload failed ({_sanitize_exc(exc, config)})",
+                        "signature": None,
+                    }
+
+            elif op == "presigned_url":
+                try:
+                    url = client.generate_presigned_url(
+                        "get_object",
+                        Params={"Bucket": bucket, "Key": smoke_key},
+                        ExpiresIn=60,
+                    )
+                    if not isinstance(url, str) or not url:
+                        raise ValueError("empty presigned URL")
+                    status_code, body = getter(url, _PARITY_HTTP_TIMEOUT)
+                    got_sha = hashlib.sha256(body).hexdigest()
+                    if status_code == 200 and got_sha == smoke_sha256:
+                        results[op] = {
+                            "status": "PASS",
+                            "detail": f"{side_label}: presigned GET returned 200 and matching SHA-256",
+                            "signature": {"http_status": status_code, "bytes": len(body), "sha256": got_sha},
+                        }
+                    else:
+                        results[op] = {
+                            "status": "FAIL",
+                            "detail": f"{side_label}: presigned GET returned status {status_code}",
+                            "signature": {"http_status": status_code, "bytes": len(body), "sha256": got_sha},
+                        }
+                except Exception as exc:  # noqa: BLE001
+                    results[op] = {
+                        "status": "FAIL",
+                        "detail": f"{side_label}: presigned_url failed ({_sanitize_exc(exc, config)})",
+                        "signature": None,
+                    }
+
+            elif op == "delete_object":
+                try:
+                    client.put_object(
+                        Bucket=bucket,
+                        Key=delete_key,
+                        Body=b"delete-probe",
+                        ContentType="text/plain",
+                    )
+                    created_keys.add(delete_key)
+                    client.delete_object(Bucket=bucket, Key=delete_key)
+                    created_keys.discard(delete_key)
+                    page = client.list_objects_v2(Bucket=bucket, Prefix=delete_key)
+                    remaining = [item["Key"] for item in (page.get("Contents") or []) if "Key" in item]
+                    if delete_key not in remaining:
+                        results[op] = {
+                            "status": "PASS",
+                            "detail": f"{side_label}: deleted synthetic probe key",
+                            "signature": {"deleted": True},
+                        }
+                    else:
+                        results[op] = {
+                            "status": "FAIL",
+                            "detail": f"{side_label}: synthetic probe key still present after delete",
+                            "signature": {"deleted": False},
+                        }
+                except Exception as exc:  # noqa: BLE001
+                    results[op] = {
+                        "status": "FAIL",
+                        "detail": f"{side_label}: delete_object failed ({_sanitize_exc(exc, config)})",
+                        "signature": None,
+                    }
+    finally:
+        # Clean up strictly and exclusively keys created inside our synthetic prefix.
+        for key in sorted(created_keys):
+            if not key.startswith(clean_prefix):
+                continue
+            try:
+                client.delete_object(Bucket=bucket, Key=key)
+            except Exception:  # noqa: BLE001
+                pass
+
+    return results
+
+
+def _live_verify(
+    data_map: dict,
+    target: dict,
+    *,
+    config: dict,
+    before_client: Any | None = None,
+    after_client: Any | None = None,
+    before_bucket: str | None = None,
+    after_bucket: str | None = None,
+    llm_complete: Callable[..., dict] | None = None,
+    http_get: Callable[[str, float], tuple[int, bytes]] | None = None,
+    allow_live_pass: bool = True,
+    prefix: str | None = None,
+) -> dict:
+    """Run the same selected S3 parity operations on Moto (before) and target (after)."""
+    selection = _select_parity_operations(data_map, config=config, llm_complete=llm_complete)
+    selected_ops: list[str] = selection["operations"]
+
+    src_side = _s3_side_config(config, "SKYSHIFT_SOURCE")
+    dst_side = _s3_side_config(config, "SKYSHIFT_TARGET")
+
+    # Resolve target (after) client first; without a real or injected target we stay incomplete.
+    resolved_after_client = after_client
+    resolved_after_bucket = after_bucket or (dst_side["bucket"] if dst_side else None)
+
+    if resolved_after_client is None and dst_side is None:
+        detail = "missing target configuration (SKYSHIFT_TARGET_*); Moto-vs-target parity not run"
+        rows = [
+            {
+                "operation": op,
+                "before": {"status": "incomplete", "detail": "not executed; target unavailable"},
+                "after": {"status": "incomplete", "detail": detail},
+                "equal": False,
+            }
+            for op in selected_ops
+        ]
+        checks = [
+            {"id": "parity_suite", "status": "incomplete", "detail": detail},
+            {"id": "parity_operations_equal", "status": "incomplete", "detail": detail},
+        ]
+        return _envelope("parity", "live", "incomplete", checks, {"operations": rows, "selection": selection}, [detail])
+
+    moto_ctx = None
+    resolved_before_client = before_client
+    resolved_before_bucket = before_bucket or (src_side["bucket"] if src_side else None)
+    before_label = "Moto baseline"
+    after_label = f"target ({target.get('target_id') or 'configured-target'})"
+
+    errors: list[str] = []
+    try:
+        if resolved_before_client is None:
+            if src_side is not None:
+                try:
+                    resolved_before_client = _build_s3_client(src_side)
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(f"before client setup failed: {_sanitize_exc(exc, config)}")
+            else:
+                try:
+                    from moto import mock_aws  # lazy optional in-process fallback
+                    import boto3
+
+                    moto_ctx = mock_aws()
+                    moto_ctx.start()
+                    resolved_before_bucket = "skyshift-parity-moto"
+                    resolved_before_client = boto3.client(
+                        "s3",
+                        region_name=_nonempty_str(config.get("AWS_DEFAULT_REGION")) or "eu-central-1",
+                        aws_access_key_id="testing",
+                        aws_secret_access_key="testing",
+                    )
+                    resolved_before_client.create_bucket(
+                        Bucket=resolved_before_bucket,
+                        CreateBucketConfiguration={
+                            "LocationConstraint": _nonempty_str(config.get("AWS_DEFAULT_REGION")) or "eu-central-1"
+                        },
+                    )
+                    before_label = "Moto in-process baseline"
+                except Exception as exc:  # noqa: BLE001
+                    if moto_ctx is not None:
+                        try:
+                            moto_ctx.stop()
+                        except Exception:  # noqa: BLE001
+                            pass
+                        moto_ctx = None
+                    errors.append(f"Moto baseline unavailable ({_sanitize_exc(exc, config)})")
+
+        if resolved_after_client is None and dst_side is not None:
+            try:
+                resolved_after_client = _build_s3_client(dst_side)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"target client setup failed: {_sanitize_exc(exc, config)}")
+
+        if (
+            resolved_before_client is None
+            or resolved_after_client is None
+            or not resolved_before_bucket
+            or not resolved_after_bucket
+        ):
+            reason = "; ".join(errors) if errors else "before or after client unavailable"
+            rows = [
+                {
+                    "operation": op,
+                    "before": {"status": "incomplete", "detail": reason},
+                    "after": {"status": "incomplete", "detail": reason},
+                    "equal": False,
+                }
+                for op in selected_ops
+            ]
+            checks = [
+                {"id": "parity_suite", "status": "incomplete", "detail": reason},
+                {"id": "parity_operations_equal", "status": "incomplete", "detail": reason},
+            ]
+            return _envelope(
+                "parity",
+                "live",
+                "incomplete",
+                checks,
+                {"operations": rows, "selection": selection},
+                errors or [reason],
+            )
+
+        run_prefix = prefix or f"skyshift-parity/{time.time_ns()}-{os.getpid()}/"
+        before_results = _execute_parity_suite(
+            resolved_before_client,
+            resolved_before_bucket,
+            selected_ops,
+            prefix=run_prefix,
+            config=config,
+            side_label=before_label,
+            http_get=http_get,
+        )
+        after_results = _execute_parity_suite(
+            resolved_after_client,
+            resolved_after_bucket,
+            selected_ops,
+            prefix=run_prefix,
+            config=config,
+            side_label=after_label,
+            http_get=http_get,
+        )
+    finally:
+        if moto_ctx is not None:
+            try:
+                moto_ctx.stop()
+            except Exception:  # noqa: BLE001
+                pass
+
+    rows: list[dict[str, Any]] = []
+    any_fail = False
+    any_incomplete = False
+    any_unequal = False
+    passed_both = 0
+
+    for op in selected_ops:
+        b = before_results.get(op) or {
+            "status": "incomplete",
+            "detail": f"{before_label}: operation skipped",
+            "signature": None,
+        }
+        a = after_results.get(op) or {
+            "status": "incomplete",
+            "detail": f"{after_label}: operation skipped",
+            "signature": None,
+        }
+        b_status = b["status"]
+        a_status = a["status"]
+        b_detail = _sanitize_text(str(b.get("detail") or ""), config)
+        a_detail = _sanitize_text(str(a.get("detail") or ""), config)
+
+        if b_status == "incomplete" or a_status == "incomplete":
+            equal = False
+            any_incomplete = True
+        elif b_status == "PASS" and a_status == "PASS":
+            equal = b.get("signature") == a.get("signature")
+            if equal:
+                passed_both += 1
+            else:
+                any_unequal = True
+        elif b_status == "FAIL" and a_status == "FAIL":
+            # Both failing may agree in outcome, but NEVER produces overall PASS.
+            equal = True
+            any_fail = True
+        else:
+            equal = False
+            any_fail = True
+            any_unequal = True
+
+        rows.append(
+            {
+                "operation": op,
+                "before": {"status": b_status, "detail": b_detail},
+                "after": {"status": a_status, "detail": a_detail},
+                "equal": equal,
+            }
+        )
+
+    if any_fail or any_unequal:
+        failed_names = [
+            r["operation"]
+            for r in rows
+            if r["before"]["status"] == "FAIL" or r["after"]["status"] == "FAIL" or not r["equal"]
+        ]
+        suite_check = {
+            "id": "parity_suite",
+            "status": "FAIL",
+            "detail": f"{passed_both}/{len(rows)} operations passed on both sides; findings in: {', '.join(failed_names)}",
+        }
+        equal_check = {
+            "id": "parity_operations_equal",
+            "status": "FAIL",
+            "detail": f"parity differences or failures detected in: {', '.join(failed_names)}",
+        }
+        errors.append(suite_check["detail"])
+    elif any_incomplete or not rows or not allow_live_pass:
+        reason = (
+            "non-live/fallback execution; parity cannot claim live PASS"
+            if not allow_live_pass
+            else f"{passed_both}/{len(rows)} operations measured; incomplete or skipped operations present"
+        )
+        suite_check = {"id": "parity_suite", "status": "incomplete", "detail": reason}
+        equal_check = {"id": "parity_operations_equal", "status": "incomplete", "detail": reason}
+    else:
+        suite_check = {
+            "id": "parity_suite",
+            "status": "PASS",
+            "detail": f"{passed_both}/{len(rows)} operations passed on both Moto and target",
+        }
+        equal_check = {
+            "id": "parity_operations_equal",
+            "status": "PASS",
+            "detail": f"all {len(rows)} required/selected operations matched between Moto and target",
+        }
+
+    checks = [suite_check, equal_check]
+    statuses = [c["status"] for c in checks]
+    overall = "FAIL" if "FAIL" in statuses else ("PASS" if all(s == "PASS" for s in statuses) else "incomplete")
     return _envelope(
         "parity",
         "live",
-        "incomplete",
+        overall,
         checks,
-        data,
-        ["live parity verification not implemented (WS2-05)"],
+        {"operations": rows, "selection": selection},
+        errors,
     )

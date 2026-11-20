@@ -187,10 +187,11 @@ sys.exit(0)
             self.assertIs(ep["changed"], True)
             self.assertIs(ep["config_only"], True)
             self.assertEqual(ep["env_var"], "AWS_ENDPOINT_URL")
-            self.assertEqual(ep["source_identity"], "127.0.0.1:5000")
-            self.assertEqual(ep["target_identity"], "s3.leaseweb.example")
+            self.assertEqual(ep["source_identity"], "local-moto-source")
+            self.assertEqual(ep["target_identity"], "leaseweb-native")
 
             dumped = json.dumps(record, sort_keys=True, allow_nan=False)
+            self.assertNotIn("s3.leaseweb.example", dumped)
             self.assertNotIn(SENTINEL_SECRET, dumped)
             self.assertNotIn(SENTINEL_OTHER_SECRET, dumped)
             self.assertNotIn("X-Amz-Signature", dumped)
@@ -206,6 +207,40 @@ sys.exit(0)
         self.assertEqual(record["data"]["app_sha256_before"], self.fixture_hash)
         self.assertIsNone(record["data"]["app_sha256_after"])
         self.assertTrue(record["errors"])
+
+    def test_relative_workload_path_resolves_before_subprocess(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            nested = Path(tmpdir) / "nested" / "workload"
+            nested.mkdir(parents=True)
+            _write_fake_app(
+                nested,
+                """
+import json
+print(json.dumps({
+    "status": "PASS",
+    "checks": [
+        {"operation": "put_object", "status": "PASS", "detail": "ok"},
+        {"operation": "get_object", "status": "PASS", "detail": "ok"},
+        {"operation": "list_objects_v2", "status": "PASS", "detail": "ok"},
+    ],
+    "telemetry": {"operation": "put_metric_data", "endpoint_host": None, "status": "PASS", "detail": "ok"},
+    "errors": [],
+}))
+""",
+            )
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                record = _live_run_app(
+                    Path("nested") / "workload",
+                    SYNTHETIC_TARGET,
+                    config=BASE_CONFIG,
+                    host_network_probe=_pass_host_network,
+                )
+            finally:
+                os.chdir(old_cwd)
+            self.assertEqual(record["status"], "PASS")
+            self.assertIs(record["data"]["ok"], True)
 
     def test_proxy_and_telemetry_env_forwarding_and_secret_isolation(self):
         with tempfile.TemporaryDirectory() as tmpdir:
