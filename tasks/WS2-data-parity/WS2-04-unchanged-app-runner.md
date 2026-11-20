@@ -2,7 +2,7 @@
 id: WS2-04
 title: Bounded unchanged-application runner
 workstream: WS2
-status: in_progress
+status: review
 owner: gemini
 priority: P0
 depends_on: [WS0-01, WS2-02]
@@ -10,7 +10,7 @@ blocks: [WS2-05, WS3-07]
 files: [skyshift/parity.py, tests/ws2/test_run_app.py]
 estimate: 45m
 claimed_at: "2026-11-20T14:35:00+00:00"
-updated_at: "2026-11-20T14:35:00+00:00"
+updated_at: "2026-11-20T14:45:00+00:00"
 ---
 
 ## Goal
@@ -57,3 +57,4 @@ If target access is unavailable, run the process lifecycle and unchanged-hash ch
 
 - 2026-11-20 12:07 UTC — Planned runner. No application or target process has run.
 - 2026-11-20 14:35 UTC — Claimed and started by gemini under SPEED MODE. Implementing bounded run_app with proxy/telemetry env forwarding and structured functional-check outcome for WS3-07.
+- 2026-11-20 14:45 UTC — Implemented bounded run_app in skyshift/parity.py and 11 unit tests in tests/ws2/test_run_app.py. Local acceptance (Windows, Python 3.14.5): `python -B -m unittest discover -s tests/ws2 -v` -> 47 OK; `python -B -m unittest tests.ws4.test_stub_run_all -v` -> 19 OK; `python tasks/board.py --check` -> OK. Pending live VM run by claude-3 (requested in inbox-WS3.md) before setting done.
