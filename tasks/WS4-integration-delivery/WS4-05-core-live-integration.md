@@ -2,15 +2,15 @@
 id: WS4-05
 title: Integrate the real pre-lunch discover translate migrate and parity path
 workstream: WS4
-status: todo
-owner: null
+status: in_progress
+owner: claude-2
 priority: P0
 depends_on: [WS0-01, WS1-05, WS2-06, WS4-02]
 blocks: [WS4-06]
 files: [skyshift/cli.py, tests/ws4/test_core_integration.py]
 estimate: 60m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T14:33:00+00:00"
+updated_at: "2026-11-20T14:33:00+00:00"
 ---
 
 ## Goal
@@ -44,3 +44,4 @@ If registry access alone fails under a valid 4/5 gate, use the documented offlin
 
 ## Log
 - 2026-11-20: Planned only. No live core integration, supplied-VM validation or provider/model call has been run.
+- 2026-11-20T14:33:00+00:00: claimed by claude-2 under SPEED MODE (human decision Miguel 14:30 UTC; multiple WS4 claims authorized).

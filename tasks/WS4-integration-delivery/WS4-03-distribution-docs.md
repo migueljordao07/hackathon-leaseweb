@@ -2,15 +2,15 @@
 id: WS4-03
 title: Package a fresh-clone install with jury README and Apache license
 workstream: WS4
-status: todo
-owner: null
+status: in_progress
+owner: claude-2
 priority: P0
 depends_on: [WS4-01]
 blocks: [WS4-07]
 files: [README.md, LICENSE, requirements.txt, .gitignore, .env.example, tests/ws4/test_distribution.py]
 estimate: 45m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T14:33:00+00:00"
+updated_at: "2026-11-20T14:33:00+00:00"
 ---
 
 ## Goal
@@ -42,3 +42,4 @@ If the supplied VM cannot install a Python dependency, prefer a compatible publi
 
 ## Log
 - 2026-11-20: Planned only. Root files, clean installation and VM have not been changed or tested by this planner.
+- 2026-11-20T14:33:00+00:00: claimed by claude-2 under SPEED MODE (human decision Miguel 14:30 UTC; multiple WS4 claims authorized).

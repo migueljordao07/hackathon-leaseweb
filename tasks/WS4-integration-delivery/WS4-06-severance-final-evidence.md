@@ -2,15 +2,15 @@
 id: WS4-06
 title: Integrate severance rerun and produce final measured evidence
 workstream: WS4
-status: todo
-owner: null
+status: in_progress
+owner: claude-2
 priority: P0
 depends_on: [WS3-07, WS4-05]
 blocks: [WS4-07]
 files: [skyshift/cli.py, skyshift/evidence.py, skyshift/templates/report/report.html.j2, tests/ws4/test_severance_integration.py]
 estimate: 60m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T14:33:00+00:00"
+updated_at: "2026-11-20T14:33:00+00:00"
 ---
 
 ## Goal
@@ -44,3 +44,4 @@ If the live model is unavailable, replay a validated cached explanation with an 
 
 ## Log
 - 2026-11-20: Planned only. No severance drill, network denial, model call, final evidence or VM test has been performed.
+- 2026-11-20T14:33:00+00:00: claimed by claude-2 under SPEED MODE (human decision Miguel 14:30 UTC; multiple WS4 claims authorized).
