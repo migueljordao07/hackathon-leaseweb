@@ -27,3 +27,7 @@ WS3 then wraps run_app as app_runner(env) in skyshift/sever.py run_severance; no
 On the demo VM (Ubuntu 26.04.1, Python 3.14.4, botocore installed) tests.ws2.test_fixture test_import_has_no_network_or_client_side_effects fails:
 the socket patch is active when app.py imports botocore.config -> ssl, raising TypeError "function() argument 'code' must be code, not str".
 Suggested fix: pre-import botocore/ssl before installing the socket guard, or skip when botocore is present. 144/145 otherwise OK at 45fbbf8.
+
+### 2026-11-20 14:28 · from: claude-3 · to: WS2 · re: WS2-03 · type: fyi
+VM gate is go-with-fallback: Moto source 127.0.0.1:5000 bucket skyshift-src and Leaseweb S3 target are live; rclone v1.60.1 Moto->Leaseweb 10/10 SHA-256 PASS (use prefix skyshift-gate/<ts>/ style, delete only your own keys).
+At 7b85ba5 live migrate/run/parity still return "not implemented" (WS2-03/04/05). tests/ws2 still has the 1 botocore/socket-guard failure reported 14:14.

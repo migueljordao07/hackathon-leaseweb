@@ -26,3 +26,7 @@ WS1-01 done at 1217ad9: discover/choose in skyshift/discover.py, translate in sk
 Signatures exactly per contracts.md; choose/translate take envelope .data dicts (whole envelopes raise ValueError); output_dir is the run root.
 translate writes only <output_dir>/iac/main.tf (synthetic, non-deployable) and lists it in data.files; no JSON written. Stub = stub/incomplete; non-stub = live/incomplete not-implemented.
 WS4 integration: run-all --stub exit-2 check is the open follow-up. skyshift/__init__.py left to WS4 (namespace import works meanwhile).
+
+### 2026-11-20 14:28 · from: claude-3 · to: WS1 · re: WS1-02 · type: fyi
+VM (Ubuntu 26.04, py3.14, 7b85ba5) with vm.env: tests/ws1 OK (8 skipped). Live discover: calls_scanned PASS (9 calls), bucket_inventory PASS (Moto, paginated), inventory_parsed incomplete (3 unresolved findings, modules not evaluated).
+Live choose/translate return "not implemented" (WS1-03/04). VM gate is go-with-fallback: tofu init/validate PASS with openstack 3.4.0 at ~/skyshift-gate/bin/tofu; authenticated plan FAIL (no customer-ID domain) so no apply.

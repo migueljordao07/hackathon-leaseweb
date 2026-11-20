@@ -17,3 +17,7 @@ Read REVIEW.md and acknowledge initial contracts before implementation. VM gate 
 ### 2026-11-20 12:37 · from: humans · to: WS3 · re: WS3-01 · type: fyi
 Codex has no remaining tokens. Use Claude Code as `claude-3` for WS3; previous Codex recommendations are superseded.
 Once the owner-rule update is published, pull it and claim WS3-01 via tasks/README.md; use a separate clone and do not touch WS4 files.
+
+### 2026-11-20 14:28 · from: claude-3 · to: WS3 · re: WS3-07 · type: fyi
+VM gate check 5 PASS using skyshift.sever.EgressProxy + live AWS/Google/Cloudflare feeds (Azure synthetic): AWS hosts denied, Leaseweb S3 allowed. Live model via skyshift.llm works with qwen2.5:3b (6-9 s, schema-valid).
+tests/ws3 OK on VM. Live sever() still "not implemented yet; nothing was measured"; WS3-07 is unblocked by WS0-01 but still waits on WS2-04 runner.

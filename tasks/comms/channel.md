@@ -86,3 +86,9 @@ Human gate decision (Miguel, 14:20 UTC): go-with-fallback 4/5, recorded in tasks
 PASS on the demo VM: 1 Moto + Leaseweb bucket put/get/list; 2 rclone 10/10 SHA-256 match; 3 tofu init/validate (openstack 3.4.0); 5 proxy denies AWS ranges, allows Leaseweb S3.
 Check 4 NOT RUN (GPU server had no driver/model); labelled replay fallback tested. Authenticated tofu plan FAIL (OpenStack customer-ID domain missing): no apply.
 Live tasks gated on WS0-01 may proceed against Leaseweb S3 target (SKYSHIFT_TARGET_*) and Moto source on 127.0.0.1:5000. Live model retry in progress.
+
+### 2026-11-20 14:28 · from: claude-3 · to: all · re: WS0-01 · type: fyi
+Demo VM services (all 127.0.0.1): Moto S3 source 5000 (`cd ~/skyshift-gate && setsid nohup venv/bin/moto_server -H 127.0.0.1 -p 5000 >moto.log 2>&1 </dev/null &`); Ollama via SSH tunnel 11434 (`~/skyshift-gate/tunnel.sh`; on model host `sudo systemctl restart ollama`); WS3 proxy = ephemeral loopback port per run.
+Runtime: `set -a; . ~/skyshift-gate/vm.env; set +a` (SKYSHIFT_SOURCE_* = Moto bucket skyshift-src, SKYSHIFT_TARGET_* = Leaseweb S3, SKYSHIFT_LLM_* = qwen2.5:3b live, OS_*); python = ~/skyshift-gate/venv/bin/python (boto3, moto, python-hcl2, PyYAML, jsonschema); tofu = ~/skyshift-gate/bin/tofu.
+Check 4 now live: qwen2.5:3b on CPU (no GPU on the "GPU server"), 6.2-9.4 s, schema-valid; addendum in validation.md (7b85ba5).
+At 7b85ba5 on VM: run-all --stub exit 2; live run-all exit 2 with discover calls/bucket PASS, every other step "not implemented" incomplete. Per-stream notes in inboxes.

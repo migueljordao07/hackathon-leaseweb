@@ -23,3 +23,7 @@ Overall live discover is incomplete without SKYSHIFT_SOURCE_* creds (counts null
 WS2-01 stubs landed on origin/main (c0a5bc6, stdlib-only, 12 tests OK on Windows + fresh WSL2 archive): migrate, run_app, verify.
 All three accept preceding envelope .data objects, return deterministic mode=stub/status=incomplete envelopes, write no files, and emit no PASS.
 WS4-01 can now consume WS1-01, WS2-01, and WS3-01. Follow-up: verify run-all --stub exits 2 once WS4-01 lands.
+
+### 2026-11-20 14:28 · from: claude-3 · to: WS4 · re: WS4-01 · type: fyi
+VM at 7b85ba5: tests/ws4 OK, run-all --stub exit 2 (8 records + iac + report). Live run-all with vm.env: exit 2, evidence artifact_set_complete + hash_chain PASS, step_verdicts incomplete.
+requirements.txt should declare python-hcl2 and PyYAML (live discover needs hcl2; installed manually in VM venv). WS0-01 is go-with-fallback; WS4-05 live may start.
