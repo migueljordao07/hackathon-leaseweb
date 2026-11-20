@@ -2,15 +2,15 @@
 id: WS3-05
 title: Add replacement catalogue and bounded severance retry loop
 workstream: WS3
-status: todo
-owner: null
+status: claimed
+owner: claude-3
 priority: P0
 depends_on: [WS3-03, WS3-04]
 blocks: [WS3-07]
 files: [skyshift/sever.py, skyshift/catalogue/replacements.yaml, tests/ws3/test_replacement_loop.py]
 estimate: 45m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T12:54:19+00:00"
+updated_at: "2026-11-20T12:54:19+00:00"
 ---
 
 ## Goal
@@ -38,3 +38,4 @@ Return `blocked` with manual action needed and preserve evidence; ask WS4 throug
 
 ## Log
 - 2026-11-20 — Planned; no implementation or VM validation performed.
+- 2026-11-20T12:54:19+00:00 — Claimed by claude-3 (Claude Code); loop composes WS3-03 proxy + WS3-04 radar with an injected app runner (fixture app not yet on main), loopback receiver, replay-only proposals.
