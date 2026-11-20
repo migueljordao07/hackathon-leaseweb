@@ -57,6 +57,22 @@ class SeveranceReportTest(unittest.TestCase):
         self.assertIn("lsw.c7a.medium", html)
         self.assertIn("&lt;match&gt;", html)
 
+    def test_adopted_existing_requires_same_run_migrate_and_parity_pass(self):
+        translate = dict(cli.EMPTY_DATA["translate"])
+        translate["resources"] = [{"source_id": "aws_s3_bucket.demo", "method": "adopted_existing",
+                                   "status": "mapped", "target_type": "x", "manual_reason": None}]
+        base = [_record("discover"), _record("choose"), _record("translate", translate),
+                _record("migrate"), _record("run"), _record("parity"), _record("sever", SEVER)]
+        with tempfile.TemporaryDirectory() as tmp:
+            ok = evidence.build_evidence(base, output_dir=Path(tmp), config={})
+            base[5] = {**base[5], "status": "incomplete"}
+            bad = evidence.build_evidence(base, output_dir=Path(tmp), config={})
+        self.assertEqual(ok["status"], "PASS")
+        self.assertEqual(ok["checks"][-1]["id"], "adopted_existing_verified")
+        self.assertEqual(bad["status"], "incomplete")
+        self.assertEqual(bad["checks"][-1]["status"], "incomplete")
+        self.assertIn("parity", bad["checks"][-1]["detail"])
+
     def test_missing_attempts_render_placeholder(self):
         records = [_record(s) for s in cli.STEPS[:-1]]
         with tempfile.TemporaryDirectory() as tmp:

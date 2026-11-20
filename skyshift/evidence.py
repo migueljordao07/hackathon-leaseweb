@@ -161,6 +161,29 @@ def _overall(statuses: list[str]) -> str:
     return "PASS"
 
 
+def _adopted_check(records: list[dict]) -> dict | None:
+    """Contract (Miguel, 15:07 UTC): adopted_existing resources count as mapped only when
+    migrate and parity are live PASS in the same run; otherwise evidence is not PASS."""
+    by_step = {r.get("step"): r for r in records if isinstance(r, dict)}
+    data = (by_step.get("translate") or {}).get("data")
+    resources = data.get("resources") if isinstance(data, dict) else None
+    adopted = [str(r.get("source_id")) for r in resources or []
+               if isinstance(r, dict) and r.get("method") == "adopted_existing"]
+    if not adopted:
+        return None
+    unmet = [step for step in ("migrate", "parity")
+             if (by_step.get(step) or {}).get("mode") != "live"
+             or (by_step.get(step) or {}).get("status") != "PASS"]
+    names = ", ".join(adopted)
+    if unmet:
+        return {"id": "adopted_existing_verified", "status": "incomplete",
+                "detail": f"adopted existing resource(s) {names} not verified: "
+                          f"{', '.join(unmet)} not live PASS in this run"}
+    return {"id": "adopted_existing_verified", "status": "PASS",
+            "detail": f"adopted existing resource(s) {names} verified by live migrate and "
+                      "parity PASS in this run; not created or managed by OpenTofu"}
+
+
 def _checks(records: list[dict], stub: bool) -> list[dict]:
     failed = [r["step"] for r in records if r["status"] == "FAIL"]
     not_live_pass = [r["step"] for r in records if r["mode"] != "live" or r["status"] != "PASS"]
@@ -173,6 +196,8 @@ def _checks(records: list[dict], stub: bool) -> list[dict]:
     else:
         verdicts = {"id": "step_verdicts", "status": "PASS",
                     "detail": "all seven step records are live PASS"}
+    adopted = _adopted_check(records)
+    extra = [adopted] if adopted else []
     if stub:
         return [
             {"id": "artifact_set_complete", "status": "incomplete",
@@ -180,14 +205,14 @@ def _checks(records: list[dict], stub: bool) -> list[dict]:
             {"id": "hash_chain", "status": "incomplete",
              "detail": "SHA-256 chain computed over synthetic stub records; not live evidence"},
             verdicts,
-        ]
+        ] + extra
     return [
         {"id": "artifact_set_complete", "status": "PASS",
          "detail": "seven step records present in contract order"},
         {"id": "hash_chain", "status": "PASS",
          "detail": "SHA-256 chain recomputed and verified from canonical record bytes"},
         verdicts,
-    ]
+    ] + extra
 
 
 def _open_items(records: list[dict], stub: bool) -> list[str]:

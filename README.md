@@ -14,7 +14,7 @@ Exit plans (for example under DORA-style operational-resilience expectations) us
 |---|------|------------------|--------|
 | 1 | discover | Terraform resources, boto3 calls (static AST scan), source buckets, readiness score | `out/discover.json` |
 | 2 | choose | Leaseweb target selection from human-approved availability; prices stay `null` unless cited | `out/choose.json` |
-| 3 | translate | AWS resources → OpenTofu for the target (templates first), `tofu init/validate` | `out/translate.json`, `out/iac/main.tf` |
+| 3 | translate | AWS resources → OpenTofu for the target (templates first; existing human-provisioned resources adopted only when migrate + parity prove them), `tofu init/validate` | `out/translate.json`, `out/iac/main.tf` |
 | 4 | migrate | Copy synthetic objects source → target, streaming SHA-256 on both sides, complete listings | `out/migrate.json` |
 | 5 | run | Run the **unchanged** fixture app against the target (config-only change), app hash before/after | `out/run.json` |
 | 6 | parity | Same S3 operation suite before (Moto) and after (target) | `out/parity.json` |
@@ -25,18 +25,20 @@ AI (an OpenAI-compatible endpoint such as a local Ollama model) only drafts expl
 
 ## Status (honest)
 
-Latest live `run-all` on the Leaseweb demo VM (14:51 UTC, Moto source → Leaseweb Object Storage target): **7 of 8 steps PASS live; overall exit 2 (incomplete)**, 9 s.
+Latest live `run-all` on the Leaseweb demo VM (15:08 UTC, Moto source → Leaseweb Object Storage target, Leaseweb Public Cloud OpenStack region): **exit 0 — 8/8 steps live PASS**, 10 s.
 
 | Step | Live result | What was measured |
 |------|-------------|-------------------|
 | discover | **PASS** | Terraform resources, 9 boto3 calls, live source bucket inventory; readiness score |
 | choose | **PASS** | Leaseweb native object storage; provider approved and storage verified; prices left `null` (not invented) |
-| translate | incomplete | `tofu init` + `tofu validate` PASS on generated OpenStack IaC; 1 of 3 resources templated, 2 left as manual (instance image/flavor, pre-provisioned bucket); no apply |
+| translate | **PASS** | 2 resources templated to OpenStack (security group; instance on `Ubuntu 24.04` / `lsw.c7a.medium`, the smallest available flavor, not an exact t3.micro match) + 1 **adopted existing resource, not managed by OpenTofu** (pre-provisioned bucket, accepted only because migrate and parity passed on it in the same run); `tofu validate` PASS; authenticated `tofu plan` exit 0 checked separately; no apply |
 | migrate | **PASS** | rclone copy, 4/4 objects SHA-256 matched source vs target |
 | run | **PASS** | unchanged app, 4/4 functional checks on the target, app SHA-256 identical before/after |
 | parity | **PASS** | 4/4 operations equal: Moto before vs Leaseweb after |
-| sever | **PASS** | AWS telemetry denied by the allowlist proxy → config-only `local-otel` replacement → green; 0 radar bypasses |
-| evidence | incomplete | hash chain verifies; overall incomplete only because translate has manual resources |
+| sever | **PASS** | AWS telemetry denied by the allowlist proxy → config-only `local-otel` replacement → green; red attempt kept in the record; 0 radar bypasses |
+| evidence | **PASS** | SHA-256 hash chain over the seven records verifies; all step verdicts live PASS |
+
+Model explanations come from a small local model (`qwen2.5:3b` via Ollama, CPU) or labelled replay; they never decide verdicts.
 
 A step that is not yet measured is reported `incomplete` and the run exits 2. Nothing is presented as passing unless it was measured.
 
