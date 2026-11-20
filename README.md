@@ -25,7 +25,7 @@ AI (an OpenAI-compatible endpoint such as a local Ollama model) only drafts expl
 
 ## Status (honest)
 
-Latest live `run-all` on the Leaseweb demo VM (15:08 UTC, Moto source → Leaseweb Object Storage target, Leaseweb Public Cloud OpenStack region): **exit 0 — 8/8 steps live PASS**, 10 s.
+Latest live `run-all` on the Leaseweb demo VM (15:08 UTC, commit 9902f32, Moto source → Leaseweb Object Storage target, Leaseweb Public Cloud OpenStack region): **exit 0 — 8/8 steps live PASS**, 10 s.
 
 | Step | Live result | What was measured |
 |------|-------------|-------------------|
