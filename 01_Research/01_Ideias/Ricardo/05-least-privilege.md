@@ -2,8 +2,11 @@
 
 > For **cloud security engineers and platform administrators**, we help **eliminate wildcard permissions, overly broad security groups, and dormant cloud access** using **AI-driven log-to-policy reduction**, improving **cloud posture security and preventing data exfiltration**.
 
-**Proposed by:** Team · **Status:** Exploring  
-**Theme:** Security & data protection
+**Proposed by:** Ricardo · **Status:** Exploring  
+**Theme:** Security & data protection  
+**Date:** 20 November 2026
+
+Duplicate this file as `NN-short-idea-name.md`. Spend 5-10 minutes on the first pass; use short bullets and mark unknowns explicitly. Use the [team briefing](../../ai-cloud-infrastructure-team-briefing.md) for context.
 
 ## 1. Problem and user
 
@@ -23,7 +26,7 @@
 
 | Alternative or workaround | What it already solves | Our specific difference |
 |---|---|---|
-| AWS IAM Access Analyzer / Cloudsplaining | Identifies overly broad IAM policies and public resources | Passive scanning; LeastPrivilege AI takes access logs, calculates exact delta, and auto-generates the minimal hardened replacement policy code. |
+| AWS IAM Access Analyzer / Cloudsplaining | Identifies overly broad IAM policies and public resources. *(Note: AWS IAM Access Analyzer already provides native policy generation from CloudTrail activity).* | Passive scanning vs proactive synthesis; LeastPrivilege AI aims to integrate cross-cloud RBAC and Terraform security groups into one policy workflow. |
 | Permify / OPA (Open Policy Agent) | Enforces authorization policies at runtime | Requires custom Rego code and pre-planning; LeastPrivilege AI operates retroactively on existing messy cloud code to bring it into compliance. |
 
 **Why would this user choose our approach?** Fixes years of accumulated cloud permission tech debt in minutes without breaking running applications.
@@ -71,6 +74,8 @@
 
 ## 7. Team decision
 
+Use the [official criteria](../../../00_Context/challenge-and-guidelines.md). Scores are provisional discussion aids, not jury predictions; score each from 1 to 5 with equal weight.
+
 | Criterion | Score | Reason |
 |---|---|---|
 | Innovation | 3.5/5 | Useful AI application to policy generation, though policy generators exist. |
@@ -79,5 +84,5 @@
 | Presentation and clarity | 4/5 | Intuitive "Before vs After" attack surface reduction metric. |
 | **Total** | **15.5/20** | |
 
-**Decision:** Shortlist  
+**Decision:** Exploring  
 **Reason and next action:** Solid security idea; easy to build as a backup if the team wants a pure cybersecurity angle.

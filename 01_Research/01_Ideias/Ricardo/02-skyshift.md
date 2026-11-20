@@ -2,8 +2,11 @@
 
 > For **infrastructure teams trapped in AWS or Azure vendor lock-in**, we help **translate proprietary cloud configurations (Terraform/CloudFormation) into European sovereign cloud architectures (Leaseweb/OpenStack)** using **AI-guided semantic schema translation and cost-saving estimation**, improving **migration velocity from weeks to minutes while cutting egress and compute costs**.
 
-**Proposed by:** Team · **Status:** Exploring  
-**Theme:** Migration & sovereignty
+**Proposed by:** Ricardo · **Status:** Shortlisted  
+**Theme:** Migration & sovereignty  
+**Date:** 20 November 2026
+
+Duplicate this file as `NN-short-idea-name.md`. Spend 5-10 minutes on the first pass; use short bullets and mark unknowns explicitly. Use the [team briefing](../../ai-cloud-infrastructure-team-briefing.md) for context.
 
 ## 1. Problem and user
 
@@ -23,7 +26,7 @@
 
 | Alternative or workaround | What it already solves | Our specific difference |
 |---|---|---|
-| AWS Transform / Azure Migrate | Automated migration of VMware and on-prem workloads *into* their respective proprietary clouds | One-way street designed to lock users in; SkyShift automates migration *away* from hyperscalers to European sovereign alternatives like Leaseweb. |
+| AWS Transform / Azure Migrate | Automated migration of VMware and on-prem workloads *into* their respective proprietary clouds | **Market Gap:** Hyperscaler tools are strictly one-way to capture workloads. No dedicated automated tool exists in the market to transpile AWS/Azure Terraform directly to European sovereign cloud providers (Leaseweb/OpenStack). Engineers currently do this manually or paste into generic chat interfaces. |
 | Terraformer / Infracost | Terraformer imports existing cloud state into HCL; Infracost estimates AWS/GCP bills | SkyShift combines cross-provider schema transpilation with an instant Leaseweb cost-benefit projection. |
 
 **Why would this user choose our approach?** Provides an immediate, low-friction path to escape hyperscaler lock-in, generating production-grade European sovereign cloud manifests in seconds.
@@ -71,6 +74,8 @@
 
 ## 7. Team decision
 
+Use the [official criteria](../../../00_Context/challenge-and-guidelines.md). Scores are provisional discussion aids, not jury predictions; score each from 1 to 5 with equal weight.
+
 | Criterion | Score | Reason |
 |---|---|---|
 | Innovation | 5/5 | Directly tackles the hardest aspect of sovereign cloud adoption: IaC refactoring. |
@@ -79,5 +84,5 @@
 | Presentation and clarity | 5/5 | Compelling business story: "Drop your AWS code here, save 60%, and run on sovereign European cloud in 2 minutes". |
 | **Total** | **19/20** | |
 
-**Decision:** Shortlist  
+**Decision:** Shortlisted  
 **Reason and next action:** Prime contender for the hackathon grand prize given its direct synergy with Leaseweb's core cloud offering. Build a proof-of-concept translation script.

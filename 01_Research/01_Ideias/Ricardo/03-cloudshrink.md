@@ -2,8 +2,11 @@
 
 > For **cloud platform and DevOps engineers**, we help **identify and safely eliminate unattached storage, idle compute, and runaway NAT egress costs** using **AI-driven usage pattern analysis and human-in-the-loop remediation PRs**, improving **cloud cost efficiency without risk of breaking production workloads**.
 
-**Proposed by:** Team · **Status:** Exploring  
-**Theme:** AI-assisted operations
+**Proposed by:** Ricardo · **Status:** Exploring  
+**Theme:** AI-assisted operations  
+**Date:** 20 November 2026
+
+Duplicate this file as `NN-short-idea-name.md`. Spend 5-10 minutes on the first pass; use short bullets and mark unknowns explicitly. Use the [team briefing](../../ai-cloud-infrastructure-team-briefing.md) for context.
 
 ## 1. Problem and user
 
@@ -23,7 +26,7 @@
 
 | Alternative or workaround | What it already solves | Our specific difference |
 |---|---|---|
-| AWS Cost Explorer / GCP Recommender | Flags underutilized EC2 instances and idle disks based on basic threshold heuristics | Passive dashboards require manual investigation; CloudShrink verifies context and outputs ready-to-merge Git/IaC pull requests. |
+| AWS Cost Explorer / GCP Recommender | Flags underutilized EC2 instances and idle disks based on basic threshold heuristics | Passive dashboards require manual investigation; CloudShrink verifies context and outputs ready-to-merge Git/IaC pull requests. *(Note: Market is crowded with FinOps startups like Cast AI, Zesty, and Vantage).* |
 | Cloud Custodian | Open-source rule engine running scheduled YAML policies to filter and terminate resources | Requires writing and maintaining complex policy YAMLs; CloudShrink uses natural language reasoning and contextual awareness to prevent false-positive deletions. |
 
 **Why would this user choose our approach?** Turns passive cost charts into safe, one-click automated cleanup actions with zero risk of deleting vital enterprise data.
@@ -71,6 +74,8 @@
 
 ## 7. Team decision
 
+Use the [official criteria](../../../00_Context/challenge-and-guidelines.md). Scores are provisional discussion aids, not jury predictions; score each from 1 to 5 with equal weight.
+
 | Criterion | Score | Reason |
 |---|---|---|
 | Innovation | 3.5/5 | FinOps is an established domain, but autonomous safe remediation is still cutting-edge. |
@@ -79,5 +84,5 @@
 | Presentation and clarity | 4.5/5 | "We saved €420 in 30 seconds" is universally understood by any judge. |
 | **Total** | **16.5/20** | |
 
-**Decision:** Shortlist  
+**Decision:** Exploring  
 **Reason and next action:** Great fallback if IaC transpilation proves too intricate; high applicability and intuitive pitch demo.

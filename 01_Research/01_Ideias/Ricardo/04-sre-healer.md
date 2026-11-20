@@ -2,8 +2,11 @@
 
 > For **on-call SREs and systems engineers**, we help **diagnose multi-service production incidents and execute safe remediations** using **AI log correlation and bounded diagnostic command execution on Linux hosts**, improving **Mean Time to Resolution (MTTR) and eliminating alert fatigue**.
 
-**Proposed by:** Team · **Status:** Exploring  
-**Theme:** AI-assisted operations
+**Proposed by:** Ricardo · **Status:** Exploring  
+**Theme:** AI-assisted operations  
+**Date:** 20 November 2026
+
+Duplicate this file as `NN-short-idea-name.md`. Spend 5-10 minutes on the first pass; use short bullets and mark unknowns explicitly. Use the [team briefing](../../ai-cloud-infrastructure-team-briefing.md) for context.
 
 ## 1. Problem and user
 
@@ -23,7 +26,7 @@
 
 | Alternative or workaround | What it already solves | Our specific difference |
 |---|---|---|
-| HolmesGPT | Open-source Kubernetes and system investigation CLI using LLMs | SRE-Healer focuses specifically on single-node Linux VMs (like the Leaseweb hackathon environment) with an integrated local human-in-the-loop repair loop. |
+| HolmesGPT / K8sGPT | Open-source Kubernetes and system investigation CLI using LLMs | HolmesGPT focuses primarily on Kubernetes clusters. SRE-Healer focuses specifically on single-node Linux VMs / bare-metal hosts (like the Leaseweb hackathon environment) with an integrated local human-in-the-loop repair loop. |
 | Datadog / New Relic Watchdog | Anomaly detection alerts and APM trace correlation | Commercial SaaS requires extensive agent setup and proprietary licensing; SRE-Healer is lightweight, open-source, and executes real remediation commands directly on the host. |
 
 **Why would this user choose our approach?** SREs get an intelligent co-pilot directly in their Linux terminal that diagnoses chaotic system crashes and safely fixes them in seconds.
@@ -72,6 +75,8 @@
 
 ## 7. Team decision
 
+Use the [official criteria](../../../00_Context/challenge-and-guidelines.md). Scores are provisional discussion aids, not jury predictions; score each from 1 to 5 with equal weight.
+
 | Criterion | Score | Reason |
 |---|---|---|
 | Innovation | 4/5 | Hands-on Linux AIOps with live interactive remediation. |
@@ -80,5 +85,5 @@
 | Presentation and clarity | 5/5 | **The best possible live demo on stage**: injecting a live crash on the Leaseweb VM and watching the AI fix it in front of the jury. |
 | **Total** | **18.5/20** | |
 
-**Decision:** Shortlist  
+**Decision:** Exploring  
 **Reason and next action:** Extremely high live demo score. Build a quick test script to inject a crash and verify diagnostic latency.

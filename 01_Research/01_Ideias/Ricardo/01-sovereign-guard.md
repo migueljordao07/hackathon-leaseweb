@@ -2,14 +2,17 @@
 
 > For **European DevOps and compliance engineers**, we help **detect extraterritorial data exposure and non-sovereign dependencies in cloud configurations** using **contextual AI reasoning over Infrastructure-as-Code and data sovereignty policies**, improving **GDPR, EU Data Act, and DORA audit readiness while preventing vendor lock-in**.
 
-**Proposed by:** Team · **Status:** Exploring  
-**Theme:** Migration & sovereignty
+**Proposed by:** Ricardo · **Status:** Shortlisted  
+**Theme:** Migration & sovereignty  
+**Date:** 20 November 2026
+
+Duplicate this file as `NN-short-idea-name.md`. Spend 5-10 minutes on the first pass; use short bullets and mark unknowns explicitly. Use the [team briefing](../../ai-cloud-infrastructure-team-briefing.md) for context.
 
 ## 1. Problem and user
 
 - **Who encounters this, and when?** European DevOps engineers, cloud architects, and Data Protection Officers (DPOs) deploying infrastructure on AWS, Azure, or GCP under strict EU regulatory regimes (GDPR, EU Data Act, Schrems II, DORA, NIS2).
 - **What goes wrong today?** Developers routinely provision resources (S3 buckets, Azure Blobs, BigQuery datasets, cross-region replication, CDN edge distributions) with configurations that route, replicate, or process EU personal data through infrastructure subject to the US CLOUD Act or hosted in non-EU jurisdictions without realizing the legal and technical blast radius.
-- **Current workaround:** Manual spreadsheet compliance checklists, static linting rules (e.g. checkov / trivy regexes for regions), or expensive external legal/security audits conducted weeks after code has reached production.
+- **Current workaround:** Manual spreadsheet compliance checklists, static linting rules (e.g. Checkov / tfsec regexes for regions), or expensive external legal/security audits conducted weeks after code has reached production.
 - **Evidence:** European Commission Cloud Sovereignty Framework (v1.2.1, Oct 2025) emphasizes that EU data location alone is insufficient; data control, operational autonomy, and provider jurisdiction matter. The EU Data Act (2024–2027) mandates removing switching barriers, but operational lock-in and extraterritorial jurisdiction risks remain critical enterprise concerns.
 
 ## 2. Proposed solution and AI contribution
@@ -23,8 +26,8 @@
 
 | Alternative or workaround | What it already solves | Our specific difference |
 |---|---|---|
-| Trivy / Checkov / tfsec | Static regex and AST rule matching for known security misconfigurations and CVEs | Identifies geopolitical jurisdiction risks, US CLOUD Act exposure, and suggests direct code migration to European sovereign clouds (e.g. Leaseweb). |
-| Cloud Health / CSPM tools (Wiz, Prisma) | Runtime cloud posture scanning and vulnerability alerting | Pre-deployment IaC focus with automated generative patching to sovereign European equivalents; runs locally without sending enterprise code to third-party US SaaS. |
+| Trivy / Checkov / tfsec | Static regex and AST rule matching for known security misconfigurations and geographic region strings | **Market Gap:** Existing tools only check basic geographic strings (e.g., `eu-central-1`) and fail to detect legal jurisdiction/CLOUD Act exposure or provider corporate ownership. SovereignGuard adds contextual legal sovereignty analysis and auto-generates replacement patches for European sovereign clouds (e.g., Leaseweb). |
+| Cloud Health / CSPM tools (Wiz, Prisma Cloud) | Post-deployment cloud posture scanning and vulnerability alerting | Pre-deployment IaC focus with automated generative patching to sovereign European equivalents; runs locally without sending enterprise code to third-party US SaaS. |
 
 **Why would this user choose our approach?** Developers get an immediate pre-commit audit showing exactly why their Terraform violates EU sovereignty rules along with an automated patch to deploy on a sovereign European provider.
 
@@ -71,6 +74,8 @@
 
 ## 7. Team decision
 
+Use the [official criteria](../../../00_Context/challenge-and-guidelines.md). Scores are provisional discussion aids, not jury predictions; score each from 1 to 5 with equal weight.
+
 | Criterion | Score | Reason |
 |---|---|---|
 | Innovation | 4/5 | Combines IaC security scanning with geopolitical sovereignty and GDPR compliance. |
@@ -79,5 +84,5 @@
 | Presentation and clarity | 5/5 | Extremely clear problem, relatable "before vs after" story, strong alignment with Leaseweb and EU themes. |
 | **Total** | **18/20** | |
 
-**Decision:** Shortlist  
+**Decision:** Shortlisted  
 **Reason and next action:** High alignment with the Leaseweb hackathon theme; build a 3-file Terraform test fixture to validate HCL translation.
