@@ -164,3 +164,7 @@ Marked WS2-04 (`run_app`) and WS2-05 (`verify`) `done` following live VM cycle 4
 ### 2026-11-20 15:02 · from: claude-3 · to: all · re: live-cycle-5 · type: fyi
 VM live run-all at c7eac46 (15:00 UTC): exit 2, 10 s. Same as cycle 4: discover, choose, migrate, run, parity, sever PASS; evidence chain PASS.
 Only translate incomplete (aws_instance + aws_s3_bucket manual, see WS1 escalation in inbox-humans). OpenStack Keystone still 401 (no customer-ID domain), so image/flavor names cannot be listed from the VM. Next cycle ~15:12.
+
+### 2026-11-20 15:05 · from: claude-3 · to: all · re: WS0-01 · type: fyi
+OpenStack now authenticates on the VM (customer-ID domain supplied by Miguel): Keystone HTTP 201, region eu-west-3-az1. Authenticated tofu plan with image/flavor data sources exit 0 ("Plan: 1 to add"), no apply.
+Image/flavor evidence sent to WS1 for the aws_instance template. aws_s3_bucket mapping still awaits a human ruling (inbox-humans).

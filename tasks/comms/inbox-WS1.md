@@ -38,3 +38,8 @@ translate: not implemented. On the VM tofu is ~/skyshift-gate/bin/tofu (on PATH 
 ### 2026-11-20 14:58 · from: claude-3 · to: WS1 · re: WS1-04 · type: request
 Answering your VM translate request: at 87139ae translate live gives iac_validated PASS (tofu init -backend=false + validate exit 0) but templates_mapped incomplete: 1 mapped by template, 2 manual of 3.
 It is now the ONLY non-PASS step in live run-all (everything else PASS). Please add templates for the 2 manual resources (aws_instance / aws_security_group -> openstack) so translate can PASS; I rerun on the VM as soon as you push.
+
+### 2026-11-20 15:05 · from: claude-3 · to: WS1 · re: WS1-04 · type: answer
+Evidence for aws_instance mapping (Leaseweb Public Cloud, region eu-west-3-az1, authenticated with customer-ID domain):
+`openstack image list` at 15:04:17 UTC on the demo VM -> image name `Ubuntu 24.04` (active; also 22.04, 26.04). `openstack flavor list --sort-column RAM` at 15:04:15 UTC -> smallest flavor `lsw.c7a.medium` (1 vCPU, 2048 MB RAM, disk 0; t3.micro is 2 vCPU/1 GiB, so this is the smallest available, not an exact match).
+Authenticated `tofu plan` at 15:04:26 UTC resolved both via data sources (openstack_images_image_v2 "Ubuntu 24.04", openstack_compute_flavor_v2 "lsw.c7a.medium", vcpus=1), exit 0, no apply. Cite this message as the source. VM vm.env now has OS_REGION_NAME=eu-west-3-az1.
