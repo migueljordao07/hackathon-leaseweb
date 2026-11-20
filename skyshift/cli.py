@@ -47,6 +47,12 @@ NEEDS = {
     "sever": ("discover", "choose"),
     "evidence": (),
 }
+# Steps whose live behaviour is driven by configuration (endpoints, buckets, app) and
+# can still be measured without usable upstream data. They run with the contract's
+# placeholder data, but such a record can never be PASS (capped at incomplete).
+# translate and choose stay hard dependencies: without resources/target they would
+# measure nothing meaningful.
+SOFT_NEEDS = frozenset({"migrate", "run", "parity", "sever"})
 
 COMMANDS = {
     "discover": ("discover",),
@@ -192,6 +198,8 @@ def _invoke(step: str, records: dict, *, workload: Path, out: Path, config: dict
             stub: bool) -> object:
     # Functions are looked up at call time so tests can inject doubles per module.
     def data(name: str) -> dict:
+        if name not in records:  # dependency not run in this command
+            return copy.deepcopy(EMPTY_DATA[name])
         return copy.deepcopy(records[name]["data"])
 
     if step == "discover":
@@ -223,14 +231,21 @@ def run_steps(steps: tuple[str, ...], *, workload: Path, out: Path, config: dict
     usable: set[str] = set()
     for step in steps:
         missing = [name for name in NEEDS[step] if name not in usable]
-        if missing:
+        soft = bool(missing) and step in SOFT_NEEDS
+        # Inputs view: unusable upstream data is replaced by contract placeholders
+        # (never stale files); the hashed records themselves are left untouched.
+        inputs = {name: records[name] for name in usable}
+        inputs.update({name: {"data": copy.deepcopy(EMPTY_DATA[name])} for name in missing})
+        if step == "evidence":
+            inputs = records
+        if missing and not soft:
             record = _placeholder(
                 step, mode, "upstream_available",
                 f"not run: upstream {', '.join(missing)} produced no usable data",
                 f"skipped: upstream {', '.join(missing)} unavailable")
         else:
             try:
-                result = _invoke(step, records, workload=workload, out=out, config=config,
+                result = _invoke(step, inputs, workload=workload, out=out, config=config,
                                  stub=stub)
             except Exception as exc:  # converted to an incomplete record by contract
                 record = _placeholder(step, mode, "step_completed",
@@ -240,12 +255,25 @@ def run_steps(steps: tuple[str, ...], *, workload: Path, out: Path, config: dict
                 record, valid = _accept(step, result, mode, config)
                 if valid:
                     usable.add(step)
+                    if soft:
+                        record = _cap_without_upstream(record, missing)
         if step == "evidence" and step not in usable:
             # A report must never outlive the evidence record it was rendered from.
             (out / evidence_mod.REPORT_NAME).unlink(missing_ok=True)
         records[step] = record
         evidence_mod.atomic_write_text(out / f"{step}.json", _pretty(record))
     return records
+
+
+def _cap_without_upstream(record: dict, missing: list[str]) -> dict:
+    """A step measured without usable upstream data is never PASS; FAIL stays FAIL."""
+    names = ", ".join(missing)
+    record["checks"].append({"id": "upstream_available", "status": "incomplete",
+                             "detail": f"ran with placeholder data: upstream {names} unusable"})
+    record["errors"].append(f"upstream {names} unavailable; result capped at incomplete")
+    if record["status"] == "PASS":
+        record["status"] = "incomplete"
+    return record
 
 
 def _pretty(record: dict) -> str:

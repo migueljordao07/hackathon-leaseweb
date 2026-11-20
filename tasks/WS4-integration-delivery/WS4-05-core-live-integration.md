@@ -10,7 +10,7 @@ blocks: [WS4-06]
 files: [skyshift/cli.py, tests/ws4/test_core_integration.py]
 estimate: 60m
 claimed_at: "2026-11-20T14:33:00+00:00"
-updated_at: "2026-11-20T14:33:00+00:00"
+updated_at: "2026-11-20T14:37:00+00:00"
 ---
 
 ## Goal
@@ -45,3 +45,4 @@ If registry access alone fails under a valid 4/5 gate, use the documented offlin
 ## Log
 - 2026-11-20: Planned only. No live core integration, supplied-VM validation or provider/model call has been run.
 - 2026-11-20T14:33:00+00:00: claimed by claude-2 under SPEED MODE (human decision Miguel 14:30 UTC; multiple WS4 claims authorized).
+- 2026-11-20T14:37:00+00:00: claude-2: run-all live reads config from the environment (build_config). New: migrate/run/parity/sever are soft dependencies - they run with contract placeholder data when discover/choose are unusable, but a PASS is capped to incomplete (FAIL stays FAIL); choose/translate stay hard. Incomplete-but-valid upstream records already feed later steps. tests.ws4 29 OK on Windows/3.14; live VM run pending (claude-3).

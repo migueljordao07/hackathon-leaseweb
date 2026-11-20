@@ -266,10 +266,15 @@ class StubRunAllTest(unittest.TestCase):
         self.assertNotIn("abcdef0123", text)
         self.assertNotIn("user:pw", text)
         self.assertNotIn(STALE, text)
-        for step in ("choose", "translate", "migrate", "run", "parity", "sever"):
+        for step in ("choose", "translate"):  # hard dependencies: skipped
             dependent = self.load(step)
             self.assertEqual(dependent["status"], "incomplete")
             self.assertEqual(dependent["checks"][0]["id"], "upstream_available", step)
+            self.assertTrue(REQUIRED_DATA[step] <= set(dependent["data"]), step)
+        for step in ("migrate", "run", "parity", "sever"):  # soft: run, capped, never PASS
+            dependent = self.load(step)
+            self.assertNotEqual(dependent["status"], "PASS", step)
+            self.assertIn("upstream_available", [c["id"] for c in dependent["checks"]], step)
             self.assertTrue(REQUIRED_DATA[step] <= set(dependent["data"]), step)
         self.assertFalse((self.out / "iac" / "main.tf").exists())
         self.assertEqual(self.load("evidence")["status"], "incomplete")
