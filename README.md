@@ -25,17 +25,18 @@ AI (an OpenAI-compatible endpoint such as a local Ollama model) only drafts expl
 
 ## Status (honest)
 
-Status at the time of writing; each record states its own `mode` (`live`, `stub`, `replay`) and `status` (`PASS`, `FAIL`, `incomplete`).
+Latest live `run-all` on the Leaseweb demo VM (14:38 UTC, Moto source → Leaseweb Object Storage target): **exit 2 (incomplete)**, 7 s.
 
-| Step | Live on the demo VM | Notes |
-|------|---------------------|-------|
-| discover | partial | Terraform + boto3 calls + live source bucket listing measured |
-| choose | in progress | |
-| translate | in progress | `tofu init/validate` verified manually on the VM; authenticated `tofu plan` failed (provider account domain), so **no apply** |
-| migrate | in progress | rclone copy with 10/10 SHA-256 matches verified manually on the VM |
-| run / parity | in progress | Moto source + Leaseweb S3 target put/get/list verified manually on the VM |
-| sever | in progress | proxy denial of AWS ranges and allow of Leaseweb S3 verified manually on the VM |
-| evidence | live | hash chain and report built from whatever records exist; incomplete steps listed as open items |
+| Step | Live result | What was measured |
+|------|-------------|-------------------|
+| discover | incomplete | 9 boto3 calls and live source bucket inventory PASS; 3 Terraform expressions left unresolved |
+| choose | **PASS** | Leaseweb native object storage; provider approved and storage verified; prices left `null` (not invented) |
+| translate | incomplete | OpenStack templates in progress; `tofu init/validate` verified manually; no apply |
+| migrate | **PASS** | rclone copy, 4/4 objects SHA-256 matched source vs target |
+| run | incomplete | unchanged-app run against the target in progress |
+| parity | incomplete | Moto-before / target-after operation suite in progress |
+| sever | **PASS** | AWS telemetry denied by the allowlist proxy → config-only `local-otel` replacement → green; 0 radar bypasses; app hash unchanged |
+| evidence | incomplete | hash chain verifies; overall incomplete because not every step is PASS |
 
 A step that is not yet measured is reported `incomplete` and the run exits 2. Nothing is presented as passing unless it was measured.
 
