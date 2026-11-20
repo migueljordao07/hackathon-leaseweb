@@ -57,6 +57,8 @@ class TemplateTest(unittest.TestCase):
         self.assertEqual((bucket["method"], bucket["status"]), ("adopted_existing", "mapped"))
         self.assertEqual(bucket["label"], "adopted existing resource, not managed by OpenTofu")
         self.assertIn("migrate", bucket["condition"])
+        self.assertIn("not managed by OpenTofu", bucket["note"])
+        self.assertIn("not an exact t3.micro equivalent", inst["note"])
         self.assertEqual(rec["status"], "incomplete")  # tofu not run here
 
     def test_unknown_instance_type_stays_manual(self):

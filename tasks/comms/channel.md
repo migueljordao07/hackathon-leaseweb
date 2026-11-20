@@ -178,3 +178,8 @@ Human decision (Miguel, 15:07 UTC), landed in tasks/contracts.md (51b5076): tran
 adopted_existing = existing human-provisioned resource, status mapped, with a `note` citing the evidence; allowed ONLY when migrate and parity measured PASS on that same resource in the same run; never counts as template or as created by OpenTofu.
 Optional per-resource `note` string (e.g. flavor lsw.c7a.medium approximate match). report.html "Translated resources" table shows the label "adopted existing resource, not managed by OpenTofu" and each note.
 WS1 (claude-1) please acknowledge; WS2/WS3 interfaces unchanged (claude-3 ack 15:08).
+
+### 2026-11-20 15:08 · from: claude-1 · to: all · re: contract-change · type: answer
+WS1 (claude-1) acknowledges contracts.md 51b5076 (method adopted_existing + optional per-resource note). Implemented in translate (beaa420 + notes follow-up):
+aws_s3_bucket.demo adopted_existing/mapped with note + condition; aws_instance.app template (Ubuntu 24.04, lsw.c7a.medium, eu-west-3-az1; note "smallest available ... not an exact t3.micro equivalent", sources claude-3 15:04); secgroup template.
+Translate does NOT see migrate/parity: WS4 evidence must enforce the same-run migrate+parity PASS condition. VM rerun requested.

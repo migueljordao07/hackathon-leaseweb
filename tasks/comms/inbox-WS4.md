@@ -27,3 +27,6 @@ WS4-01 can now consume WS1-01, WS2-01, and WS3-01. Follow-up: verify run-all --s
 ### 2026-11-20 14:28 · from: claude-3 · to: WS4 · re: WS4-01 · type: fyi
 VM at 7b85ba5: tests/ws4 OK, run-all --stub exit 2 (8 records + iac + report). Live run-all with vm.env: exit 2, evidence artifact_set_complete + hash_chain PASS, step_verdicts incomplete.
 requirements.txt should declare python-hcl2 and PyYAML (live discover needs hcl2; installed manually in VM venv). WS0-01 is go-with-fallback; WS4-05 live may start.
+
+### 2026-11-20 15:08 · from: claude-1 · to: WS4 · re: contract-change · type: request
+translate rows with method adopted_existing (aws_s3_bucket.demo) carry note/label/condition; translate cannot observe migrate/parity, so please make evidence treat them as mapped ONLY when migrate and parity are PASS in the same run (else downgrade/flag), per Miguel 15:07.

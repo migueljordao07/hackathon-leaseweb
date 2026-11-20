@@ -403,7 +403,9 @@ def _render_resources(resources: list[dict], storage_mode: str | None) -> tuple[
                     row.update(method="template", status="mapped",
                                image={"name": image["name"], "source": image["source"]},
                                flavor={"name": flavor["flavor"], "source_instance_type": itype,
-                                       "label": flavor["label"], "source": flavor["source"]})
+                                       "label": flavor["label"], "source": flavor["source"]},
+                               note=(f"flavor {flavor['flavor']}: {flavor['label']}; image "
+                                     f"{image['name']}; source: {flavor['source']}"))
                 else:
                     row["manual_reason"] = ("rendered with operator inputs: no verified mapping from "
                                             f"AMI {_describe(ami)} to a Leaseweb image or from "
@@ -426,7 +428,10 @@ def _render_resources(resources: list[dict], storage_mode: str | None) -> tuple[
                                condition="requires migrate PASS and parity PASS on the same "
                                          "target bucket in the same run (human decision "
                                          "2026-11-20 15:07 UTC)",
-                               decision="tasks/comms/inbox-humans.md (Miguel, 15:07 UTC)")
+                               decision="tasks/comms/inbox-humans.md (Miguel, 15:07 UTC)",
+                               note=(ADOPTED_LABEL + "; evidence: VM gate check 1 put/get/list "
+                                     "PASS on the Leaseweb bucket; valid only if migrate and "
+                                     "parity PASS on the same bucket in this run"))
                 else:
                     blocks.append(render_template("storage.tf.j2", {
                         "source_id": safe_id, "target_type": target_type, "reason": reason,

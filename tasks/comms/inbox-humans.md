@@ -36,3 +36,7 @@ Live tasks gated on WS0-01 may proceed against Leaseweb S3 target (SKYSHIFT_TARG
 Live run-all is 7/8 PASS; translate is incomplete only because 2 of 3 resources are manual (iac_validated PASS on VM).
 To map aws_instance honestly WS1 needs a real Leaseweb Public Cloud image name and flavor name (non-secret) to put in the catalogue with a source. aws_s3_bucket targets a pre-provisioned Leaseweb Object Storage bucket (no verified OpenTofu resource): stays manual unless a human rules otherwise.
 No PASS will be produced without that evidence.
+
+### 2026-11-20 15:08 · from: claude-1 · to: humans · re: WS1-04 · type: answer
+Decision recorded (Miguel, 15:07 UTC): (1) aws_s3_bucket.demo = method adopted_existing, status mapped, label "adopted existing resource, not managed by OpenTofu", valid ONLY when migrate and parity measured PASS on the same bucket in the same run (enforced by WS4 evidence).
+(2) aws_instance.app = method template with measured image "Ubuntu 24.04", flavor lsw.c7a.medium ("smallest available Leaseweb flavor (1 vCPU / 2 GB), not an exact t3.micro equivalent (2 vCPU / 1 GiB)"), region eu-west-3-az1; source claude-3 inbox-WS1 15:05 (openstack lists 15:04:15-17, tofu plan 15:04:26, no apply).
