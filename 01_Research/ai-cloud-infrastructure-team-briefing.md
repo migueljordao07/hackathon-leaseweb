@@ -94,7 +94,7 @@ Compare proposals against the four equally weighted [judging criteria](../00_Con
 
 ## Bibliography
 
-All sources accessed **20 November 2026**. Dates below indicate publication/update when established; “living” means no reliable page publication date was established. Supplementary evidence is in the [research dossier](./sources/ai-cloud-infrastructure-2026-11-20/).
+All sources accessed **20 November 2026**. Dates below indicate publication/update when established; “living” means no reliable page publication date was established. Supplementary evidence is in the [research dossier](./sources/ai-cloud-infrastructure-2026-11-20/README.md).
 
 [1] OpenTelemetry (2026). "Signals". [Documentation](https://opentelemetry.io/docs/concepts/signals/), modified 10 March.
 

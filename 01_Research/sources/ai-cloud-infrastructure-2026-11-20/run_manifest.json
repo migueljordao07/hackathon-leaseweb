@@ -16,5 +16,11 @@
   ],
   "constraints": "English-only repository; 1500-2000-word briefing; user-specified research destination takes precedence over generic skill artifact locations",
   "supplementary_sources": "Additional historical/experimental/license references remain in the thematic notes; the JSONL registry tracks the briefing bibliography",
-  "validation_status": "Structure and reference checks passed; network link checker pending"
+  "validation_status": "Completed",
+  "validation": {
+    "structure": "Passed all required checks; optional academic counterevidence/claims-table sections omitted for briefing length",
+    "bibliography_urls": "17/17 passed strict network accessibility checks",
+    "claim_support": "Primary passages manually checked and independent read-only review completed",
+    "products_and_benchmarks": "Not executed"
+  }
 }
