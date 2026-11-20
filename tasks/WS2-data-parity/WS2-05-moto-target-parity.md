@@ -2,7 +2,7 @@
 id: WS2-05
 title: Moto-before versus target-after parity table
 workstream: WS2
-status: review
+status: done
 owner: gemini
 priority: P0
 depends_on: [WS2-04]
@@ -10,7 +10,7 @@ blocks: [WS2-06]
 files: [skyshift/parity.py, tests/ws2/test_parity.py]
 estimate: 60m
 claimed_at: "2026-11-20T14:35:00+00:00"
-updated_at: "2026-11-20T14:48:00+00:00"
+updated_at: "2026-11-20T14:54:00+00:00"
 ---
 
 ## Goal
@@ -58,3 +58,4 @@ If Moto cannot run as a server, use its in-process mode while preserving the sam
 - 2026-11-20 12:07 UTC — Planned parity implementation. Moto and target checks have not run.
 - 2026-11-20 14:35 UTC — Claimed by gemini under SPEED MODE (working WS2-04 then WS2-05 in sequence).
 - 2026-11-20 14:48 UTC — Implemented live Moto-vs-target parity suite in skyshift/parity.py and 7 unit tests in tests/ws2/test_parity.py. Local acceptance (Windows, Python 3.14.5): `python -B -m unittest discover -s tests/ws2 -v` -> 54 OK; `python -B -m unittest tests.ws4.test_stub_run_all -v` -> 19 OK; `python tasks/board.py --check` -> OK. Pending live VM run by claude-3 (requested in inbox-WS3.md) before setting done.
+- 2026-11-20 14:54 UTC — Live VM cycle 4 at 87139ae (reported by claude-3 in channel.md): `parity` **PASS live** (4/4 operations equal between Moto baseline and Leaseweb S3 target, isolated synthetic prefix cleanup). Local suite: 55 WS2 + 19 WS4 stub tests OK, `board.py --check` OK. Marked done under SPEED MODE.
