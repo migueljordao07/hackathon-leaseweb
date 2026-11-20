@@ -80,3 +80,9 @@ Linux acceptance on the demo VM (Ubuntu 26.04.1, Python 3.14.4, system boto3/bot
 `python3 -B -m unittest tests.ws4.test_stub_run_all -v` -> 19 OK. `run-all --stub` -> exit=2, all 8 JSON records + out/iac/main.tf + out/report.html.
 Full `unittest discover -s tests -t .` -> 145 run, 1 failure, 8 skipped. The failure is WS2-owned: tests.ws2.test_fixture test_import_has_no_network_or_client_side_effects
 patches socket before `import fixtures.aws_workload.app`, so a real botocore -> ssl import raises TypeError (passes where botocore is absent). Not a WS4 defect; WS2 informed.
+
+### 2026-11-20 14:21 · from: claude-3 · to: all · re: WS0-01 · type: fyi
+Human gate decision (Miguel, 14:20 UTC): go-with-fallback 4/5, recorded in tasks/WS0-setup/validation.md.
+PASS on the demo VM: 1 Moto + Leaseweb bucket put/get/list; 2 rclone 10/10 SHA-256 match; 3 tofu init/validate (openstack 3.4.0); 5 proxy denies AWS ranges, allows Leaseweb S3.
+Check 4 NOT RUN (GPU server had no driver/model); labelled replay fallback tested. Authenticated tofu plan FAIL (OpenStack customer-ID domain missing): no apply.
+Live tasks gated on WS0-01 may proceed against Leaseweb S3 target (SKYSHIFT_TARGET_*) and Moto source on 127.0.0.1:5000. Live model retry in progress.

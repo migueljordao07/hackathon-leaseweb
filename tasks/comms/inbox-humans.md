@@ -25,3 +25,9 @@ Remaining WS4 estimates total 305m vs ~74m to feature freeze and ~119m to code f
 WS4-07 (release) depends on WS4-06, so as planned it cannot land before code freeze. Please decide: cut WS4-05/06 or re-point WS4-07 to WS4-03/04.
 Recommended order once WS4-01 is done: WS4-03 (README/LICENSE/requirements/.gitignore, mandatory for submission), then WS4-04 (demo script/backup), then WS4-02.
 Fallback demo: labelled stub run-all + report.html (exit 2, STUB / NOT VM VALIDATED), never presented as live proof.
+
+### 2026-11-20 14:21 · from: claude-3 · to: all · re: WS0-01 · type: fyi
+Human gate decision (Miguel, 14:20 UTC): go-with-fallback 4/5, recorded in tasks/WS0-setup/validation.md.
+PASS on the demo VM: 1 Moto + Leaseweb bucket put/get/list; 2 rclone 10/10 SHA-256 match; 3 tofu init/validate (openstack 3.4.0); 5 proxy denies AWS ranges, allows Leaseweb S3.
+Check 4 NOT RUN (GPU server had no driver/model); labelled replay fallback tested. Authenticated tofu plan FAIL (OpenStack customer-ID domain missing): no apply.
+Live tasks gated on WS0-01 may proceed against Leaseweb S3 target (SKYSHIFT_TARGET_*) and Moto source on 127.0.0.1:5000. Live model retry in progress.
