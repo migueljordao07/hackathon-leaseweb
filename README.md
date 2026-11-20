@@ -25,18 +25,18 @@ AI (an OpenAI-compatible endpoint such as a local Ollama model) only drafts expl
 
 ## Status (honest)
 
-Latest live `run-all` on the Leaseweb demo VM (14:38 UTC, Moto source → Leaseweb Object Storage target): **exit 2 (incomplete)**, 7 s.
+Latest live `run-all` on the Leaseweb demo VM (14:51 UTC, Moto source → Leaseweb Object Storage target): **7 of 8 steps PASS live; overall exit 2 (incomplete)**, 9 s.
 
 | Step | Live result | What was measured |
 |------|-------------|-------------------|
-| discover | incomplete | 9 boto3 calls and live source bucket inventory PASS; 3 Terraform expressions left unresolved |
+| discover | **PASS** | Terraform resources, 9 boto3 calls, live source bucket inventory; readiness score |
 | choose | **PASS** | Leaseweb native object storage; provider approved and storage verified; prices left `null` (not invented) |
-| translate | incomplete | OpenStack templates in progress; `tofu init/validate` verified manually; no apply |
+| translate | incomplete | `tofu init` + `tofu validate` PASS on generated OpenStack IaC; 1 of 3 resources templated, 2 left as manual (instance image/flavor, pre-provisioned bucket); no apply |
 | migrate | **PASS** | rclone copy, 4/4 objects SHA-256 matched source vs target |
-| run | incomplete | unchanged-app run against the target in progress |
-| parity | incomplete | Moto-before / target-after operation suite in progress |
-| sever | **PASS** | AWS telemetry denied by the allowlist proxy → config-only `local-otel` replacement → green; 0 radar bypasses; app hash unchanged |
-| evidence | incomplete | hash chain verifies; overall incomplete because not every step is PASS |
+| run | **PASS** | unchanged app, 4/4 functional checks on the target, app SHA-256 identical before/after |
+| parity | **PASS** | 4/4 operations equal: Moto before vs Leaseweb after |
+| sever | **PASS** | AWS telemetry denied by the allowlist proxy → config-only `local-otel` replacement → green; 0 radar bypasses |
+| evidence | incomplete | hash chain verifies; overall incomplete only because translate has manual resources |
 
 A step that is not yet measured is reported `incomplete` and the run exits 2. Nothing is presented as passing unless it was measured.
 
