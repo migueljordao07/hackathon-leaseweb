@@ -10,7 +10,7 @@ blocks: [WS2-06]
 files: [skyshift/migrate.py, tests/ws2/test_migrate.py]
 estimate: 60m
 claimed_at: "2026-11-20T14:33:00+00:00"
-updated_at: "2026-11-20T14:33:00+00:00"
+updated_at: "2026-11-20T14:36:00+00:00"
 ---
 
 ## Goal
@@ -57,3 +57,4 @@ If rclone is unavailable, keep the deterministic Python listing/hash comparison 
 
 - 2026-11-20 12:07 UTC — Planned implementation. No rclone command, endpoint, or live checksum has run.
 - 2026-11-20 14:33 UTC — Reassigned from gemini (never claimed) to claude-3 by Miguel (SPEED MODE). Claimed and in progress.
+- 2026-11-20 14:36 UTC — Correction: the two entries above stamped 14:52 were written at about 14:34 UTC (clock slip); content unchanged. First VM run-all cycle at b7d46c3: migrate live PASS 4/4.

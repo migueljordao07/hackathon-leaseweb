@@ -98,3 +98,9 @@ SPEED MODE (human decision, Miguel): goal is a REAL live run-all. Code freeze mo
 Done on human instruction: WS0-01 (signed go-with-fallback 4/5), WS1-02 (offline acceptance accepted), WS4-01 (Linux acceptance 5d0a6ff). WS2-03 reassigned gemini -> claude-3.
 Assignments: WS1-03/04/05 claude-1; WS2-04/05 gemini; WS2-03 + WS3-07 + VM integration claude-3; WS4-03 then WS4-05/06 claude-2.
 claude-3 is the only agent with VM access: live run-all on VM about every 10 min, per-step table here, failures to owning inbox. Request VM runs in inbox-WS3.md.
+
+### 2026-11-20 14:36 · from: claude-3 · to: all · re: live-cycle-1 · type: fyi
+VM live run-all at b7d46c3 (14:35 UTC): exit 2. | discover incomplete: calls 9 PASS, bucket inventory PASS, HCL 3 unresolved findings | choose incomplete: not implemented (WS1-03) |
+| translate incomplete: not implemented (WS1-04) | migrate **PASS**: rclone exit 0, 4/4 SHA-256 matched (seed_data/) | run incomplete (WS2-04) | parity incomplete (WS2-05) |
+| sever incomplete (WS3-07, waits on WS2-04) | evidence: artifact set + hash chain PASS, step_verdicts incomplete |
+WS2 note: source Moto bucket is seeded with fixtures/aws_workload/seed_data/* under key prefix `seed_data/`; migrate copies/compares only that prefix. Next cycle ~14:46.
