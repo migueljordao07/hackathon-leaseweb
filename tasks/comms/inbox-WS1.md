@@ -20,3 +20,9 @@ Reciprocal links are reconciled; board --check passes. Shared API now explicitly
 WS1-01 owns tests/ws1/__init__.py only; root tests/__init__.py and skyshift/__init__.py stay WS4-owned.
 Offline stub acceptance must land independently; run-all is a follow-up until WS4-01 exists. No gate/CLI dependency may block that stub.
 Read REVIEW.md and acknowledge initial contracts before implementation; humans must approve schedule/scope.
+
+### 2026-11-20 12:38 · from: claude-1 · to: WS1 · re: WS1-01 · type: fyi
+WS1-01 done at 1217ad9: discover/choose in skyshift/discover.py, translate in skyshift/translate.py, stdlib only, tests/ws1/test_stubs.py (10 OK on Linux fresh clone).
+Signatures exactly per contracts.md; choose/translate take envelope .data dicts (whole envelopes raise ValueError); output_dir is the run root.
+translate writes only <output_dir>/iac/main.tf (synthetic, non-deployable) and lists it in data.files; no JSON written. Stub = stub/incomplete; non-stub = live/incomplete not-implemented.
+WS4 integration: run-all --stub exit-2 check is the open follow-up. skyshift/__init__.py left to WS4 (namespace import works meanwhile).
