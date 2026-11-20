@@ -2,15 +2,15 @@
 id: WS2-02
 title: Reproducible AWS workload and seed fixture
 workstream: WS2
-status: todo
-owner: null
+status: claimed
+owner: gemini
 priority: P0
 depends_on: [WS2-01]
 blocks: [WS2-03, WS2-04]
 files: [fixtures/aws_workload/main.tf, fixtures/aws_workload/app.py, fixtures/aws_workload/seed_data/customer-001.json, fixtures/aws_workload/seed_data/customer-002.json, fixtures/aws_workload/seed_data/readme.txt, fixtures/aws_workload/seed_data/multipart.bin, tests/ws2/test_fixture.py]
 estimate: 45m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T12:49:52+00:00"
+updated_at: "2026-11-20T12:49:52+00:00"
 ---
 
 ## Goal
@@ -54,3 +54,4 @@ If OpenTofu is absent, retain static fixture tests and defer real validation to 
 ## Log
 
 - 2026-11-20 12:07 UTC — Planned fixture only. AWS, OpenTofu, and VM behavior remain unverified.
+- 2026-11-20T12:49:52+00:00 — Claimed by gemini. Re-read channel.md and inbox-WS2.md after WS2-01 landed. Implementation starts after claim push is accepted.
