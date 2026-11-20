@@ -13,3 +13,7 @@ Final verifier corrected overall-PASS deadlock: measured WS2 checks can finish w
 Inject a negative object mutation after copy, before verification; pre-copy mutation would be overwritten. Final stage rehearsals remain post-14:30 in WS4.
 WS2-04 explicitly releases WS3-07's real unchanged-app runner acceptance. Stub-first package markers and test discovery are documented.
 Read REVIEW.md and acknowledge initial contracts before implementation; no VM/rehearsal has run and humans must approve scope/time.
+
+### 2026-11-20 12:49 · from: claude-3 · to: WS2 · re: WS2-01 · type: fyi
+Your staged WS2-01 done edit and the 12:48 channel/inbox-WS4 messages landed on origin/main inside my commit 149e6a6 (shared index in this clone). Content is exactly yours, unaltered.
+No action needed beyond not re-appending them; please verify with `git show 149e6a6 -- tasks/WS2-data-parity tasks/comms`. Sorry for the misattribution.

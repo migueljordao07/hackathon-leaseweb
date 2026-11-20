@@ -2,7 +2,7 @@
 id: WS3-03
 title: Build the local allowlist proxy enforcement path
 workstream: WS3
-status: claimed
+status: done
 owner: claude-3
 priority: P0
 depends_on: [WS3-02]
@@ -10,7 +10,7 @@ blocks: [WS3-05]
 files: [skyshift/sever.py, tests/ws3/test_proxy.py]
 estimate: 50m
 claimed_at: "2026-11-20T12:46:59+00:00"
-updated_at: "2026-11-20T12:46:59+00:00"
+updated_at: "2026-11-20T12:49:53+00:00"
 ---
 
 ## Goal
@@ -39,3 +39,7 @@ Keep the proxy API fail-closed and run deterministic decision tests only; mark l
 ## Log
 - 2026-11-20 — Planned; no implementation or VM validation performed.
 - 2026-11-20T12:46:59+00:00 — Claimed by claude-3 (Claude Code) after WS3-02 done; loopback proxy with injected resolver seams, offline tests only.
+- 2026-11-20T12:49:53+00:00 — Done (offline/loopback scope). Code in 149e6a6: skyshift/sever.py adds allowlist_from_config (exact host/port from SKYSHIFT_TELEMETRY_ENDPOINT, SKYSHIFT_TARGET_ENDPOINT_URL, AWS_ENDPOINT_URL only; URL credentials dropped), decide() (resolve -> range-check every address -> exact allowlist; unresolved/unknown/stale fail closed), EgressProxy (127.0.0.1 only, CONNECT + absolute-form HTTP, connects only to the checked IP, strips Proxy-* headers, 16 KiB header cap, 5 s IO timeout, 30 s/8 MiB tunnel bounds, 32 connection cap, 403/400/502 with no direct fallback, sanitized events host/ip/port/decision/reason/via/outcome), PROXY_SCOPE shown in sever() check details. sever() envelope shape unchanged; sever() does not run the proxy until WS3-05.
+  - Acceptance on fresh WSL2 Ubuntu clone at 149e6a6 (Python 3.12.3): `python3 -B -m unittest tests.ws3.test_proxy` 13 OK in 1.2 s (allow exact host/port, wrong port/unlisted, cloud range even if allowlisted, DNS-rebind mixed answer, unresolved/malformed, stale ranges, real loopback CONNECT deny with zero upstream attempts, CONNECT tunnel echo, HTTP forward + sanitized denied event, upstream refusal 502, listener loopback/stop); all tests/ws3 41 OK; board --check OK. Windows/Python 3.14.5: 3 repeated runs OK.
+  - Limitations: no internet, real DNS or VM used; proxy only governs clients honouring HTTP(S)_PROXY (no firewall, UDP/DNS or direct-socket blocking; radar WS3-04 detects only). Not universal isolation. Executor-verified; Francisco may reopen.
+  - Process note: commit 149e6a6 also swept in gemini's pre-staged WS2-01 done/comms edits from the shared working-tree index (content intact, misattributed). Announced in channel and inbox-WS2; history not rewritten.
