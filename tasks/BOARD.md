@@ -7,14 +7,14 @@ Planning estimates are not measured durations. Read README.md and contracts.md b
 
 | id | title | status | owner | priority | depends_on |
 |---|---|---|---|---|---|
-| [WS0-01](WS0-setup/WS0-01-vm-validation.md) | Human VM validation and go or Airlock switch | todo | — | P0 | — |
+| [WS0-01](WS0-setup/WS0-01-vm-validation.md) | Human VM validation and go or Airlock switch | done | — | P0 | — |
 
 ## WS1
 
 | id | title | status | owner | priority | depends_on |
 |---|---|---|---|---|---|
-| [WS1-01](WS1-discover-translate/WS1-01-contract-stubs.md) | Contract-honouring discovery choice and translation stubs | todo | — | P0 | — |
-| [WS1-02](WS1-discover-translate/WS1-02-discovery-inventory.md) | Parse AWS dependencies inventory S3 and calculate readiness | todo | — | P0 | WS1-01 |
+| [WS1-01](WS1-discover-translate/WS1-01-contract-stubs.md) | Contract-honouring discovery choice and translation stubs | done | claude-1 | P0 | — |
+| [WS1-02](WS1-discover-translate/WS1-02-discovery-inventory.md) | Parse AWS dependencies inventory S3 and calculate readiness | done | claude-1 | P0 | WS1-01 |
 | [WS1-03](WS1-discover-translate/WS1-03-target-catalogue.md) | Choose a verified Leaseweb target with cited criteria | todo | — | P0 | WS1-02 |
 | [WS1-04](WS1-discover-translate/WS1-04-provider-templates.md) | Render known AWS resources into approved provider templates | todo | — | P0 | WS1-03, WS0-01 |
 | [WS1-05](WS1-discover-translate/WS1-05-validation-loop.md) | Validate IaC with bounded schema-constrained AI repair | todo | — | P0 | WS1-04, WS3-01 |
@@ -23,9 +23,9 @@ Planning estimates are not measured durations. Read README.md and contracts.md b
 
 | id | title | status | owner | priority | depends_on |
 |---|---|---|---|---|---|
-| [WS2-01](WS2-data-parity/WS2-01-contract-stubs.md) | Contract-honouring data and parity stubs | todo | — | P0 | — |
-| [WS2-02](WS2-data-parity/WS2-02-workload-fixture.md) | Reproducible AWS workload and seed fixture | todo | — | P0 | WS2-01 |
-| [WS2-03](WS2-data-parity/WS2-03-rclone-migration.md) | Rclone migration with per-object SHA-256 proof | todo | — | P0 | WS0-01, WS2-02 |
+| [WS2-01](WS2-data-parity/WS2-01-contract-stubs.md) | Contract-honouring data and parity stubs | done | gemini | P0 | — |
+| [WS2-02](WS2-data-parity/WS2-02-workload-fixture.md) | Reproducible AWS workload and seed fixture | done | gemini | P0 | WS2-01 |
+| [WS2-03](WS2-data-parity/WS2-03-rclone-migration.md) | Rclone migration with per-object SHA-256 proof | in_progress | claude-3 | P0 | WS0-01, WS2-02 |
 | [WS2-04](WS2-data-parity/WS2-04-unchanged-app-runner.md) | Bounded unchanged-application runner | todo | — | P0 | WS0-01, WS2-02 |
 | [WS2-05](WS2-data-parity/WS2-05-moto-target-parity.md) | Moto-before versus target-after parity table | todo | — | P0 | WS2-04 |
 | [WS2-06](WS2-data-parity/WS2-06-demo-path-verification.md) | WS2 run-all demo-path verification and handoff | todo | — | P0 | WS2-03, WS2-05, WS4-01 |
@@ -34,19 +34,19 @@ Planning estimates are not measured durations. Read README.md and contracts.md b
 
 | id | title | status | owner | priority | depends_on |
 |---|---|---|---|---|---|
-| [WS3-01](WS3-severance-ai/WS3-01-contract-stubs.md) | Create contract-honouring severance and LLM stubs | todo | — | P0 | — |
-| [WS3-02](WS3-severance-ai/WS3-02-ip-range-matcher.md) | Implement provenance-aware IP range matching | todo | — | P0 | WS3-01 |
-| [WS3-03](WS3-severance-ai/WS3-03-allowlist-proxy.md) | Build the local allowlist proxy enforcement path | todo | — | P0 | WS3-02 |
-| [WS3-04](WS3-severance-ai/WS3-04-socket-radar.md) | Add Linux socket radar with explicit detection limits | todo | — | P0 | WS3-01 |
-| [WS3-05](WS3-severance-ai/WS3-05-replacement-loop.md) | Add replacement catalogue and bounded severance retry loop | todo | — | P0 | WS3-03, WS3-04 |
-| [WS3-06](WS3-severance-ai/WS3-06-llm-client-sanitizer-replay.md) | Implement one LLM client with local sanitization and cached replay | todo | — | P0 | WS3-01 |
+| [WS3-01](WS3-severance-ai/WS3-01-contract-stubs.md) | Create contract-honouring severance and LLM stubs | done | claude-3 | P0 | — |
+| [WS3-02](WS3-severance-ai/WS3-02-ip-range-matcher.md) | Implement provenance-aware IP range matching | done | claude-3 | P0 | WS3-01 |
+| [WS3-03](WS3-severance-ai/WS3-03-allowlist-proxy.md) | Build the local allowlist proxy enforcement path | done | claude-3 | P0 | WS3-02 |
+| [WS3-04](WS3-severance-ai/WS3-04-socket-radar.md) | Add Linux socket radar with explicit detection limits | done | claude-3 | P0 | WS3-01 |
+| [WS3-05](WS3-severance-ai/WS3-05-replacement-loop.md) | Add replacement catalogue and bounded severance retry loop | done | claude-3 | P0 | WS3-03, WS3-04 |
+| [WS3-06](WS3-severance-ai/WS3-06-llm-client-sanitizer-replay.md) | Implement one LLM client with local sanitization and cached replay | done | claude-3 | P0 | WS3-01 |
 | [WS3-07](WS3-severance-ai/WS3-07-llm-json-schema-validation.md) | Validate model schemas and the WS3 run-all demo path | todo | — | P0 | WS3-05, WS3-06, WS0-01, WS2-01, WS2-04, WS4-01 |
 
 ## WS4
 
 | id | title | status | owner | priority | depends_on |
 |---|---|---|---|---|---|
-| [WS4-01](WS4-integration-delivery/WS4-01-stub-run-all.md) | Integrate the eight-step contract stubs end to end | todo | — | P0 | WS1-01, WS2-01, WS3-01 |
+| [WS4-01](WS4-integration-delivery/WS4-01-stub-run-all.md) | Integrate the eight-step contract stubs end to end | done | claude-2 | P0 | WS1-01, WS2-01, WS3-01 |
 | [WS4-02](WS4-integration-delivery/WS4-02-evidence-report.md) | Build deterministic evidence verdicts hash chain and HTML report | todo | — | P0 | WS4-01 |
 | [WS4-03](WS4-integration-delivery/WS4-03-distribution-docs.md) | Package a fresh-clone install with jury README and Apache license | todo | — | P0 | WS4-01 |
 | [WS4-04](WS4-integration-delivery/WS4-04-demo-backup.md) | Rehearse the five-minute demo and prepare a labelled backup recording | todo | — | P0 | WS4-01 |

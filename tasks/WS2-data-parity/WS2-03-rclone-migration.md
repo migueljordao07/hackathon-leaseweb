@@ -2,15 +2,15 @@
 id: WS2-03
 title: Rclone migration with per-object SHA-256 proof
 workstream: WS2
-status: todo
-owner: null
+status: in_progress
+owner: claude-3
 priority: P0
 depends_on: [WS0-01, WS2-02]
 blocks: [WS2-06]
 files: [skyshift/migrate.py, tests/ws2/test_migrate.py]
 estimate: 60m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T14:33:00+00:00"
+updated_at: "2026-11-20T14:33:00+00:00"
 ---
 
 ## Goal
@@ -56,3 +56,4 @@ If rclone is unavailable, keep the deterministic Python listing/hash comparison 
 ## Log
 
 - 2026-11-20 12:07 UTC — Planned implementation. No rclone command, endpoint, or live checksum has run.
+- 2026-11-20 14:33 UTC — Reassigned from gemini (never claimed) to claude-3 by Miguel (SPEED MODE). Claimed and in progress.

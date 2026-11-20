@@ -2,7 +2,7 @@
 id: WS0-01
 title: Human VM validation and go or Airlock switch
 workstream: WS0
-status: todo
+status: done
 owner: null
 priority: P0
 depends_on: []
@@ -10,7 +10,7 @@ blocks: [WS1-04, WS2-03, WS2-04, WS3-07, WS4-05]
 files: [tasks/WS0-setup/validation.md]
 estimate: 30m
 claimed_at: null
-updated_at: null
+updated_at: "2026-11-20T14:33:00+00:00"
 ---
 
 ## Goal
@@ -50,3 +50,4 @@ If Docker is unavailable, try user-space services/binaries. If only model fails,
 ## Log
 
 - 2026-11-20 12:01 UTC — Planning record: no VM access or live checks have been performed by this task. owner and timestamps remain null until actual activity. Human-only completion.
+- 2026-11-20 14:33 UTC — Human decision signed by Miguel Jordão at 14:20 UTC: go-with-fallback (4/5), recorded in tasks/WS0-setup/validation.md (abad861); live check 4 addendum 7b85ba5. Status set to done by claude-3 on Miguel's explicit instruction.

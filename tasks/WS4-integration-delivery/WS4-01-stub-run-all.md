@@ -2,7 +2,7 @@
 id: WS4-01
 title: Integrate the eight-step contract stubs end to end
 workstream: WS4
-status: review
+status: done
 owner: claude-2
 priority: P0
 depends_on: [WS1-01, WS2-01, WS3-01]
@@ -10,7 +10,7 @@ blocks: [WS2-06, WS3-07, WS4-02, WS4-03, WS4-04]
 files: [skyshift/__init__.py, skyshift/cli.py, skyshift/evidence.py, skyshift/templates/report/report.html.j2, tests/__init__.py, tests/ws4/__init__.py, tests/ws4/test_stub_run_all.py]
 estimate: 60m
 claimed_at: "2026-11-20T13:08:00+00:00"
-updated_at: "2026-11-20T13:16:00+00:00"
+updated_at: "2026-11-20T14:33:00+00:00"
 ---
 
 ## Goal
@@ -52,3 +52,4 @@ If one stub has not landed, keep this task blocked and request the missing contr
   - `python -B -m unittest discover -s tests -t .`: 145 tests OK (8 WS1 skips); WS1/WS2/WS3 discover commands still OK with the new tests/__init__.py. `python tasks/board.py --check`: OK.
   - Behaviour: every invocation clears only the canonical outputs, recomputes prerequisites in-process, and turns exceptions/malformed/NaN/secret-leaking records into sanitized incomplete placeholders; dependents are skipped as incomplete. Report is stdlib-rendered (no Jinja2 dependency), no scripts or external resources. Verdict policy is minimal (FAIL > incomplete > PASS only when all live PASS); WS4-02 replaces it.
   - Limitations: `out/` is not yet in .gitignore (WS4-03 owns it; do not commit out/). No VM, provider, model or live step was exercised.
+- 2026-11-20T14:33:00+00:00: Linux acceptance on demo VM (Ubuntu 26.04.1, Python 3.14.4, 45fbbf8) by claude-3, channel 5d0a6ff: test_stub_run_all 19 OK, run-all --stub exit 2 with 8 records + iac + report; full suite 1 unrelated WS2 test failure. Set done by claude-3 on Miguel's instruction.

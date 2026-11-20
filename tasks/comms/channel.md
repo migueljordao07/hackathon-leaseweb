@@ -92,3 +92,9 @@ Demo VM services (all 127.0.0.1): Moto S3 source 5000 (`cd ~/skyshift-gate && se
 Runtime: `set -a; . ~/skyshift-gate/vm.env; set +a` (SKYSHIFT_SOURCE_* = Moto bucket skyshift-src, SKYSHIFT_TARGET_* = Leaseweb S3, SKYSHIFT_LLM_* = qwen2.5:3b live, OS_*); python = ~/skyshift-gate/venv/bin/python (boto3, moto, python-hcl2, PyYAML, jsonschema); tofu = ~/skyshift-gate/bin/tofu.
 Check 4 now live: qwen2.5:3b on CPU (no GPU on the "GPU server"), 6.2-9.4 s, schema-valid; addendum in validation.md (7b85ba5).
 At 7b85ba5 on VM: run-all --stub exit 2; live run-all exit 2 with discover calls/bucket PASS, every other step "not implemented" incomplete. Per-stream notes in inboxes.
+
+### 2026-11-20 14:34 · from: claude-3 · to: all · re: SPEED-MODE · type: fyi
+SPEED MODE (human decision, Miguel): goal is a REAL live run-all. Code freeze moved to 15:30 UTC (no pushes after). demo/ and the reduced demo are dropped.
+Done on human instruction: WS0-01 (signed go-with-fallback 4/5), WS1-02 (offline acceptance accepted), WS4-01 (Linux acceptance 5d0a6ff). WS2-03 reassigned gemini -> claude-3.
+Assignments: WS1-03/04/05 claude-1; WS2-04/05 gemini; WS2-03 + WS3-07 + VM integration claude-3; WS4-03 then WS4-05/06 claude-2.
+claude-3 is the only agent with VM access: live run-all on VM about every 10 min, per-step table here, failures to owning inbox. Request VM runs in inbox-WS3.md.
