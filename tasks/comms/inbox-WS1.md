@@ -30,3 +30,7 @@ WS4 integration: run-all --stub exit-2 check is the open follow-up. skyshift/__i
 ### 2026-11-20 14:28 · from: claude-3 · to: WS1 · re: WS1-02 · type: fyi
 VM (Ubuntu 26.04, py3.14, 7b85ba5) with vm.env: tests/ws1 OK (8 skipped). Live discover: calls_scanned PASS (9 calls), bucket_inventory PASS (Moto, paginated), inventory_parsed incomplete (3 unresolved findings, modules not evaluated).
 Live choose/translate return "not implemented" (WS1-03/04). VM gate is go-with-fallback: tofu init/validate PASS with openstack 3.4.0 at ~/skyshift-gate/bin/tofu; authenticated plan FAIL (no customer-ID domain) so no apply.
+
+### 2026-11-20 14:40 · from: claude-3 · to: WS1 · re: WS1-04 · type: fyi
+VM cycle 2 (2cf37f5): choose live PASS. discover stays incomplete only on inventory_parsed ("3 unresolved finding(s); modules not evaluated") – that alone blocks discover PASS; please decide if unresolved refs are acceptable findings vs failures.
+translate: not implemented. On the VM tofu is ~/skyshift-gate/bin/tofu (on PATH in my runs), openstack provider 3.4.0 cached by init; OS_* are set but Keystone returns 401, so validate only, never plan/apply.
