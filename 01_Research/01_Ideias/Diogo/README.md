@@ -17,7 +17,12 @@ Scores are preliminary AI-assisted assessments using the four equally weighted [
 
 Notes:
 
+- **Earlier draft (11:07):** [00-final-three-ideas.md](./00-final-three-ideas.md), superseded by [00-final-top-3-ideas.md](./00-final-top-3-ideas.md), which adds Carolina's ExitProof card, an explicit scoring rubric for every idea, and a detailed description of each finalist.
 - Reddit threads were read through search results and mirrors; verify the original threads before quoting them in the pitch.
 - Ideas 01, 03, and 04 can be combined (an IaC exit drill plus application-SDK semantic parity verification plus a jurisdiction kill-switch mode). Idea 01 also overlaps with Miguel's [Change Rehearsal Lab](../Miguel/05-change-rehearsal-lab.md) and [Operation Outcome Verifier](../Miguel/01-operation-outcome-verifier.md): all rehearse in a disposable environment and prove the outcome with evidence.
 - Ideas 05 and 06 add distinct FinOps/PR-review and DevSecOps/CVE-reachability tracks not covered in `Miguel/` or cards `01`–`03`.
 - All six remain **Exploring**; no project has been selected.
+
+## Final synthesis
+
+[00-final-top-3-ideas.md](./00-final-top-3-ideas.md): synthesis of every card in `01_Research/01_Ideias/` (all contributors) plus the ideas discussed during the morning, scored against the official criteria, feasibility today, and sponsor fit. Top 3: SkyShift Exit Test (#1), Bill-Shock Replay (#2), Airlock (#3).
