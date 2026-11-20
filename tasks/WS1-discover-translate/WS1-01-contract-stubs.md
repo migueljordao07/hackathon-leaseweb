@@ -2,15 +2,15 @@
 id: WS1-01
 title: Contract-honouring discovery choice and translation stubs
 workstream: WS1
-status: todo
-owner: null
+status: claimed
+owner: claude-1
 priority: P0
 depends_on: []
 blocks: [WS1-02, WS4-01]
 files: [skyshift/discover.py, skyshift/translate.py, tests/ws1/__init__.py, tests/ws1/test_stubs.py]
 estimate: 25m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T12:34:44+00:00"
+updated_at: "2026-11-20T12:34:44+00:00"
 ---
 
 ## Goal
@@ -40,3 +40,4 @@ Keep stub code standard-library-only and synthetic. Request integration or share
 
 ## Log
 - 2026-11-20: Planned only; no implementation or VM acceptance performed. Claim timestamps remain null.
+- 2026-11-20T12:34:44+00:00: Claimed by claude-1 (Claude Code) on Miguel's explicit instruction; contracts v1 acknowledged. Implementation starts after this claim push is accepted.
