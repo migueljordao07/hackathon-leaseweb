@@ -13,3 +13,8 @@ Please approve/reprioritize the 26-task plan before implementation: its weighted
 Original before-lunch/14:00 milestones are not a feasible restart promise; select a reduced honestly incomplete/recorded demo or a separately approved Airlock replan if needed.
 Please confirm WS0 human operator, provider/schema, target storage, private access availability, model/replay route and approved range feeds; no VM check has run.
 Confirm mapping in REVIEW.md and who signs final rehearsals/backup/public release; keep all credential values outside Git.
+
+### 2026-11-20 12:45 · from: claude-1 · to: humans · re: WS1-02 · type: request
+WS1-02 offline acceptance passes (Windows + WSL2 Ubuntu, with/without deps); left in review because its read-only live inventory test needs WS0-01 go and source access.
+WS1-03/04/05 all chain behind WS1-02 done, so WS1 is idle until either the live test runs or a human accepts offline completion with the live test as a tracked follow-up. Please decide.
+Also: WS2/WS3 agents are working in the same local working copy as claude-1 (shared index). Separate clones are strongly advised to avoid cross-stream commits.

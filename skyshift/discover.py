@@ -1,25 +1,32 @@
 """Discover AWS dependencies and choose a Leaseweb target (WS1).
 
 Contract: tasks/contracts.md (Python API, shared envelope, data map, target choice).
-Standard library only. Importing this module performs no I/O, network or service start.
+Importing this module performs no I/O, network or service start, and imports only the
+standard library. Optional dependencies (python-hcl2, PyYAML, boto3) are imported lazily
+on the live path only; the ``stub=True`` path never touches them.
 
-Current state: offline stubs only (WS1-01). ``stub=True`` returns realistic synthetic
-records labelled as such; non-stub calls return an explicit not-implemented
-incomplete envelope until WS1-02/WS1-03 land. No stub ever reports PASS.
+discover (live, WS1-02): parses workload ``*.tf`` with python-hcl2 (no evaluation),
+scans ``*.py`` with ``ast`` (never executed), lists source buckets read-only with
+paginated ``list_objects_v2`` and computes the v1 readiness score deterministically.
+choose (live) remains an explicit not-implemented incomplete envelope until WS1-03.
+No stub ever reports PASS.
 """
 
 from __future__ import annotations
 
+import ast
+import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
 SCHEMA_VERSION = 1
 
 READINESS_FORMULA = "max(0, 100 - 20*proprietary - 10*unsupported - 5*us_calls)"
 
-# Resource types with a known template mapping (contracts.md, translated IaC section).
-SUPPORTED_RESOURCE_TYPES = frozenset({"aws_instance", "aws_security_group", "aws_s3_bucket"})
+CATALOGUE_PATH = Path(__file__).resolve().parent / "catalogue" / "resources.yaml"
 
-# S3 operations the S3-compatible target is expected to serve; anything else counts as unsupported.
+# Used by the offline stub only; the live path reads catalogue/resources.yaml.
+SUPPORTED_RESOURCE_TYPES = frozenset({"aws_instance", "aws_security_group", "aws_s3_bucket"})
 SUPPORTED_S3_OPERATIONS = frozenset(
     {
         "put_object",
@@ -33,6 +40,29 @@ SUPPORTED_S3_OPERATIONS = frozenset(
         "generate_presigned_url",
     }
 )
+
+# Hosts operated by US-controlled hyperscalers/CDNs (suffix match). A European region
+# of these operators is still US-controlled.
+US_CONTROLLED_SUFFIXES = (
+    "amazonaws.com",
+    "amazon.com",
+    "aws.amazon.com",
+    "cloudfront.net",
+    "googleapis.com",
+    "google.com",
+    "azure.com",
+    "windows.net",
+    "microsoft.com",
+    "cloudflare.com",
+)
+
+# Attribute names never copied from HCL into records.
+SENSITIVE_ATTRIBUTE = re.compile(
+    r"(user_data|password|secret|token|access_key|private_key|credentials?)", re.IGNORECASE
+)
+RESOURCE_REF = re.compile(r"\b((?:aws|google|azurerm)_[a-z0-9_]+)\.([A-Za-z0-9_-]+)")
+URL_LITERAL = re.compile(r"https?://[^\s\"'<>]+")
+HTTP_METHODS = frozenset({"get", "post", "put", "patch", "delete", "head", "request"})
 
 DATA_MAP_KEYS = ("resources", "calls", "buckets", "readiness")
 CHOICE_KEYS = (
@@ -63,29 +93,51 @@ def _check_config(config: object) -> None:
         raise ValueError("config must be a dict of environment names to values")
 
 
-def compute_readiness(resources: list[dict], calls: list[dict]) -> dict:
-    """Deterministic readiness score v1 (no AI).
+def _overall(checks: list[dict]) -> str:
+    statuses = [c["status"] for c in checks]
+    if "FAIL" in statuses:
+        return "FAIL"
+    if statuses and all(s == "PASS" for s in statuses):
+        return "PASS"
+    return "incomplete"
 
-    proprietary: resources whose type has no supported mapping.
-    unsupported: distinct S3 calls using an operation outside the supported set.
-    us_calls: distinct non-S3 calls to AWS-operated services (e.g. telemetry).
-    Calls are deduplicated by (file, line, service, operation).
-    """
+
+def is_us_controlled(host: str | None) -> bool:
+    if not host:
+        return False
+    host = host.lower().rstrip(".")
+    return any(host == s or host.endswith("." + s) for s in US_CONTROLLED_SUFFIXES)
+
+
+def _dedupe_calls(calls: list[dict]) -> list[dict]:
     seen: set[tuple] = set()
-    unique_calls = []
+    unique = []
     for call in calls:
         key = (call["file"], call["line"], call["service"], call["operation"])
         if key not in seen:
             seen.add(key)
-            unique_calls.append(call)
+            unique.append(call)
+    return unique
 
-    proprietary = sum(1 for r in resources if not r["supported"])
-    unsupported = sum(
-        1
-        for c in unique_calls
-        if c["service"] == "s3" and c["operation"] not in SUPPORTED_S3_OPERATIONS
-    )
-    us_calls = sum(1 for c in unique_calls if c["service"] != "s3")
+
+def compute_readiness(resources: list[dict], calls: list[dict],
+                      supported_s3_ops: frozenset | set = SUPPORTED_S3_OPERATIONS) -> dict:
+    """Deterministic readiness score v1 (no AI).
+
+    proprietary: resource instances that are unsupported or proprietary.
+    unsupported: distinct S3 operation names outside the supported set.
+    us_calls: deduplicated non-S3 calls whose literal/resolved host is US-controlled
+    (S3 calls are the migrated surface, rewired by endpoint configuration).
+    """
+    unique_calls = _dedupe_calls(calls)
+    proprietary = sum(1 for r in resources if not r["supported"] or r.get("proprietary"))
+    unsupported = len({
+        c["operation"] for c in unique_calls
+        if c["service"] == "s3" and c.get("interface", "client") == "client"
+        and c["operation"] not in supported_s3_ops
+    })
+    us_calls = sum(1 for c in unique_calls if c["service"] != "s3" and c.get("us_controlled",
+                   is_us_controlled(c.get("endpoint_host"))))
     score = max(0, 100 - 20 * proprietary - 10 * unsupported - 5 * us_calls)
     return {
         "score": score,
@@ -94,6 +146,9 @@ def compute_readiness(resources: list[dict], calls: list[dict]) -> dict:
         "unsupported": unsupported,
         "us_calls": us_calls,
     }
+
+
+# --------------------------------------------------------------------------- stub
 
 
 def _stub_data_map(workload: Path) -> dict:
@@ -135,6 +190,545 @@ def _stub_data_map(workload: Path) -> dict:
     }
 
 
+# --------------------------------------------------------------------------- catalogue
+
+
+def load_catalogue(path: Path = CATALOGUE_PATH) -> dict:
+    """Load and validate resources.yaml (requires PyYAML)."""
+    import yaml  # optional dependency, live path only
+
+    with open(path, encoding="utf-8") as handle:
+        catalogue = yaml.safe_load(handle)
+    if not isinstance(catalogue, dict) or catalogue.get("schema_version") != 1:
+        raise ValueError("resources.yaml must have schema_version: 1")
+    resources = catalogue.get("resources")
+    s3_ops = catalogue.get("s3_operations")
+    if not isinstance(resources, dict) or not isinstance(s3_ops, dict):
+        raise ValueError("resources.yaml needs resources and s3_operations mappings")
+    for rtype, entry in resources.items():
+        if not isinstance(entry, dict) or not {"supported", "proprietary", "target_kind",
+                                               "template"} <= set(entry):
+            raise ValueError(f"resources.yaml entry {rtype} is incomplete")
+    return catalogue
+
+
+def _catalogue_entry(catalogue: dict, rtype: str) -> dict:
+    entry = catalogue["resources"].get(rtype)
+    if entry is None:
+        return {"supported": False, "proprietary": True, "target_kind": None, "template": None,
+                "catalogued": False}
+    return {**entry, "catalogued": True}
+
+
+# --------------------------------------------------------------------------- HCL
+
+
+def _hcl_label(label: str) -> str:
+    return label[1:-1] if len(label) >= 2 and label[0] == label[-1] == '"' else label
+
+
+def _hcl_value(value):
+    """Normalise python-hcl2 output (v4 unquoted and v7+/v8 quoted literals).
+
+    Returns (value, unresolved_expressions).
+    """
+    if isinstance(value, str):
+        if "${" in value:
+            return {"unresolved": True, "expression": value}, [value]
+        if len(value) >= 2 and value[0] == value[-1] == '"':
+            return value[1:-1].replace('\\"', '"').replace("\\\\", "\\"), []
+        return value, []
+    if isinstance(value, list):
+        out, unresolved = [], []
+        for item in value:
+            v, u = _hcl_value(item)
+            out.append(v)
+            unresolved += u
+        return out, unresolved
+    if isinstance(value, dict):
+        out, unresolved = {}, []
+        for key, item in value.items():
+            if key.startswith("__"):
+                continue
+            v, u = _hcl_value(item)
+            out[_hcl_label(key)] = v
+            unresolved += u
+        return out, unresolved
+    return value, []
+
+
+def _walk_strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, list):
+        for item in value:
+            yield from _walk_strings(item)
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _walk_strings(item)
+
+
+def _iter_tf_files(workload: Path) -> list[Path]:
+    return sorted(
+        (p for p in workload.rglob("*.tf")
+         if not any(part.startswith(".") for part in p.relative_to(workload).parts)),
+        key=lambda p: p.relative_to(workload).as_posix(),
+    )
+
+
+def _iter_py_files(workload: Path) -> list[Path]:
+    skip = {"__pycache__", "venv", ".venv", "node_modules"}
+    return sorted(
+        (p for p in workload.rglob("*.py")
+         if not any(part.startswith(".") or part in skip
+                    for part in p.relative_to(workload).parts)),
+        key=lambda p: p.relative_to(workload).as_posix(),
+    )
+
+
+def _display_path(path: Path, workload: Path, workload_display: str) -> str:
+    rel = path.relative_to(workload).as_posix()
+    return f"{workload_display}/{rel}" if workload_display not in ("", ".") else rel
+
+
+def parse_hcl(workload: Path, catalogue: dict, workload_display: str) -> tuple[list, list]:
+    """Return (resources, findings). Malformed HCL raises ValueError."""
+    import hcl2  # optional dependency, live path only
+
+    resources: list[dict] = []
+    findings: list[dict] = []
+    for tf in _iter_tf_files(workload):
+        display = _display_path(tf, workload, workload_display)
+        try:
+            with open(tf, encoding="utf-8") as handle:
+                doc = hcl2.load(handle)
+        except Exception as exc:  # lark/hcl2 raise several exception types
+            raise ValueError(f"invalid HCL in {display}: {type(exc).__name__}") from None
+
+        provider_regions: dict[str, object] = {}
+        for block in doc.get("provider", []):
+            for name, body in block.items():
+                pname = _hcl_label(name)
+                region, unresolved = _hcl_value(body.get("region")) if isinstance(body, dict) \
+                    else (None, [])
+                if pname not in provider_regions:
+                    provider_regions[pname] = None if unresolved else region
+                if unresolved:
+                    findings.append({"file": display, "kind": "unresolved_expression",
+                                     "detail": f"provider {pname} region is an expression"})
+
+        for block in doc.get("resource", []):
+            for rtype_raw, named in block.items():
+                rtype = _hcl_label(rtype_raw)
+                for name_raw, body in named.items():
+                    name = _hcl_label(name_raw)
+                    rid = f"{rtype}.{name}"
+                    attrs, unresolved = {}, []
+                    for key, value in (body or {}).items():
+                        if key.startswith("__"):
+                            continue
+                        if SENSITIVE_ATTRIBUTE.search(key):
+                            attrs[key] = {"redacted": True}
+                            continue
+                        v, u = _hcl_value(value)
+                        attrs[key] = v
+                        unresolved += u
+                    refs = sorted({f"{m.group(1)}.{m.group(2)}"
+                                   for expr in unresolved
+                                   for m in RESOURCE_REF.finditer(expr)} - {rid})
+                    provider = rtype.split("_", 1)[0]
+                    region = provider_regions.get(provider)
+                    entry = _catalogue_entry(catalogue, rtype)
+                    record = {
+                        "id": rid,
+                        "type": rtype,
+                        "provider": provider,
+                        "region": region,
+                        "supported": bool(entry["supported"]),
+                        "proprietary": bool(entry["proprietary"]),
+                        "catalogued": entry["catalogued"],
+                        "target_kind": entry["target_kind"],
+                        "template": entry["template"],
+                        "file": display,
+                        "references": refs,
+                        "attributes": attrs,
+                        "unresolved": len(unresolved),
+                    }
+                    resources.append(record)
+                    if region is None:
+                        findings.append({"file": display, "kind": "unresolved_region",
+                                         "detail": f"{rid}: no literal provider region"})
+                    for expr in unresolved:
+                        if not RESOURCE_REF.search(expr):
+                            findings.append({"file": display, "kind": "unresolved_expression",
+                                             "detail": f"{rid}: expression not evaluated"})
+                            break
+    return resources, findings
+
+
+# --------------------------------------------------------------------------- Python
+
+
+def _literal_str(node) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
+def _kwarg(call: ast.Call, name: str):
+    for kw in call.keywords:
+        if kw.arg == name:
+            return kw.value
+    return None
+
+
+def _host(url: str | None) -> str | None:
+    if not url:
+        return None
+    try:
+        host = urlsplit(url).hostname
+    except ValueError:
+        return None
+    return host.lower() if host else None
+
+
+class _CallScanner(ast.NodeVisitor):
+    """Static boto3/requests scanner; never executes the scanned code."""
+
+    def __init__(self, display: str):
+        self.display = display
+        self.boto3_names: set[str] = set()         # aliases of the boto3 module
+        self.factory_names: dict[str, str] = {}     # from boto3 import client as c -> "client"
+        self.requests_names: set[str] = set()
+        self.http_funcs: dict[str, str] = {}        # from requests import post as p
+        self.clients: dict[str, dict] = {}          # expr -> {service, endpoint_host, interface}
+        self.calls: list[dict] = []
+        self.findings: list[dict] = []
+        self.seen_hosts: set[str] = set()
+
+    # imports -----------------------------------------------------------------
+    def visit_Import(self, node):
+        for alias in node.names:
+            if alias.name == "boto3":
+                self.boto3_names.add(alias.asname or "boto3")
+            elif alias.name == "requests":
+                self.requests_names.add(alias.asname or "requests")
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node):
+        if node.module == "boto3":
+            for alias in node.names:
+                if alias.name in ("client", "resource"):
+                    self.factory_names[alias.asname or alias.name] = alias.name
+        elif node.module == "requests":
+            for alias in node.names:
+                if alias.name in HTTP_METHODS:
+                    self.http_funcs[alias.asname or alias.name] = alias.name
+        self.generic_visit(node)
+
+    # client construction ----------------------------------------------------
+    def _factory(self, call: ast.Call) -> str | None:
+        func = call.func
+        if isinstance(func, ast.Attribute) and func.attr in ("client", "resource"):
+            base = func.value
+            if isinstance(base, ast.Name) and base.id in self.boto3_names:
+                return func.attr
+            # boto3.session.Session(...).client / boto3.Session(...).client
+            if isinstance(base, ast.Call):
+                inner = ast.unparse(base.func)
+                if any(inner in (f"{b}.Session", f"{b}.session.Session")
+                       for b in self.boto3_names):
+                    return func.attr
+        if isinstance(func, ast.Name) and func.id in self.factory_names:
+            return self.factory_names[func.id]
+        return None
+
+    def _client_info(self, call: ast.Call) -> dict | None:
+        kind = self._factory(call)
+        if kind is None:
+            return None
+        service_node = call.args[0] if call.args else _kwarg(call, "service_name")
+        service = _literal_str(service_node)
+        endpoint_node = _kwarg(call, "endpoint_url")
+        endpoint_host, endpoint_state = None, "sdk_default"
+        if endpoint_node is not None:
+            literal = _literal_str(endpoint_node)
+            endpoint_host = _host(literal) if literal else None
+            endpoint_state = "literal" if literal else "unresolved"
+            if endpoint_host:
+                self.seen_hosts.add(endpoint_host)
+        if service is None:
+            self.findings.append({"file": self.display, "line": call.lineno,
+                                  "kind": "dynamic_service",
+                                  "detail": "boto3 service name is not a literal"})
+        return {"service": service, "endpoint_host": endpoint_host,
+                "endpoint_state": endpoint_state, "interface": kind}
+
+    def visit_Assign(self, node):
+        if isinstance(node.value, ast.Call):
+            info = self._client_info(node.value)
+            if info and info["service"]:
+                for target in node.targets:
+                    self.clients[ast.unparse(target)] = info
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node):
+        if isinstance(node.value, ast.Call):
+            info = self._client_info(node.value)
+            if info and info["service"]:
+                self.clients[ast.unparse(node.target)] = info
+        self.generic_visit(node)
+
+    # calls ------------------------------------------------------------------
+    def _record(self, line: int, info: dict, operation: str, bucket, host, **extra):
+        call = {
+            "file": self.display,
+            "line": line,
+            "service": info["service"],
+            "operation": operation,
+            "bucket": bucket,
+            "endpoint_host": host,
+            "interface": info.get("interface", "client"),
+            "endpoint_state": info.get("endpoint_state"),
+        }
+        call.update(extra)
+        self.calls.append(call)
+
+    def _http_call(self, node: ast.Call, method: str):
+        url_node = node.args[0] if node.args else _kwarg(node, "url")
+        if method == "request":
+            url_node = node.args[1] if len(node.args) > 1 else _kwarg(node, "url")
+        url = _literal_str(url_node) if url_node is not None else None
+        host = _host(url)
+        if host is None:
+            self.findings.append({"file": self.display, "line": node.lineno,
+                                  "kind": "unresolved_endpoint",
+                                  "detail": f"requests.{method} URL is not a literal"})
+        else:
+            self.seen_hosts.add(host)
+        self._record(node.lineno, {"service": "http", "interface": "requests",
+                                   "endpoint_state": "literal" if host else "unresolved"},
+                     method, None, host, us_controlled=is_us_controlled(host))
+
+    def visit_Call(self, node):
+        func = node.func
+        # getattr(client, name)(...) dynamic dispatch
+        if (isinstance(func, ast.Call) and isinstance(func.func, ast.Name)
+                and func.func.id == "getattr" and func.args
+                and ast.unparse(func.args[0]) in self.clients):
+            self.findings.append({"file": self.display, "line": node.lineno,
+                                  "kind": "dynamic_dispatch",
+                                  "detail": "getattr on an AWS client; operation unknown"})
+        elif isinstance(func, ast.Attribute):
+            owner = ast.unparse(func.value)
+            info = self.clients.get(owner)
+            if info is None and isinstance(func.value, ast.Call):
+                info = self._client_info(func.value)   # chained boto3.client("s3").op()
+                if info is not None and not info["service"]:
+                    info = None
+            if info is not None:
+                bucket = _literal_str(_kwarg(node, "Bucket"))
+                if info["interface"] == "resource" and node.args:
+                    bucket = bucket or _literal_str(node.args[0])
+                if func.attr != "meta":
+                    self._record(node.lineno, info, func.attr, bucket, info["endpoint_host"],
+                                 us_controlled=self._aws_us(info))
+            elif isinstance(func.value, ast.Name) and func.value.id in self.requests_names \
+                    and func.attr in HTTP_METHODS:
+                self._http_call(node, func.attr)
+        elif isinstance(func, ast.Name) and func.id in self.http_funcs:
+            self._http_call(node, self.http_funcs[func.id])
+        self.generic_visit(node)
+
+    @staticmethod
+    def _aws_us(info: dict) -> bool:
+        if info["endpoint_state"] == "literal":
+            return is_us_controlled(info["endpoint_host"])
+        # No endpoint override: boto3 resolves the AWS-operated default endpoint.
+        return info["endpoint_state"] == "sdk_default"
+
+    # hidden telemetry: literal URLs anywhere in the module ------------------
+    def scan_literals(self, tree: ast.AST):
+        docstrings = {id(n.value) for n in ast.walk(tree)
+                      if isinstance(n, ast.Expr) and _literal_str(n.value) is not None}
+        for node in ast.walk(tree):
+            value = _literal_str(node)
+            if not value or id(node) in docstrings:
+                continue
+            for match in URL_LITERAL.finditer(value):
+                host = _host(match.group(0))
+                if host and host not in self.seen_hosts:
+                    self.seen_hosts.add(host)
+                    extra = {"us_controlled": is_us_controlled(host)}
+                    if extra["us_controlled"]:
+                        extra["dependency"] = "telemetry"
+                    self._record(node.lineno, {"service": "http", "interface": "literal_url",
+                                               "endpoint_state": "literal"},
+                                 "literal_url", None, host, **extra)
+
+
+def scan_python(workload: Path, workload_display: str) -> tuple[list, list]:
+    """Return (calls, findings). Invalid Python raises ValueError."""
+    calls: list[dict] = []
+    findings: list[dict] = []
+    for py in _iter_py_files(workload):
+        display = _display_path(py, workload, workload_display)
+        try:
+            tree = ast.parse(py.read_text(encoding="utf-8"), filename=display)
+        except (SyntaxError, UnicodeDecodeError, ValueError):
+            raise ValueError(f"invalid Python in {display}") from None
+        scanner = _CallScanner(display)
+        scanner.visit(tree)
+        scanner.scan_literals(tree)
+        calls += scanner.calls
+        findings += scanner.findings
+    calls.sort(key=lambda c: (c["file"], c["line"], c["service"], c["operation"]))
+    return _dedupe_calls(calls), findings
+
+
+# --------------------------------------------------------------------------- inventory
+
+
+def _source_client(config: dict):
+    """Explicit read-only source S3 client from SKYSHIFT_SOURCE_* keys (never global)."""
+    import boto3  # optional dependency, live path only
+
+    kwargs = {
+        "aws_access_key_id": config["SKYSHIFT_SOURCE_ACCESS_KEY_ID"],
+        "aws_secret_access_key": config["SKYSHIFT_SOURCE_SECRET_ACCESS_KEY"],
+    }
+    if config.get("SKYSHIFT_SOURCE_ENDPOINT_URL"):
+        kwargs["endpoint_url"] = config["SKYSHIFT_SOURCE_ENDPOINT_URL"]
+    if config.get("AWS_DEFAULT_REGION"):
+        kwargs["region_name"] = config["AWS_DEFAULT_REGION"]
+    return boto3.session.Session().client("s3", **kwargs)
+
+
+def _error_code(exc: Exception) -> str:
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        code = response.get("Error", {}).get("Code")
+        if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,64}", code):
+            return code
+    return type(exc).__name__
+
+
+def inventory_buckets(names: list[str], config: dict) -> tuple[list, dict]:
+    """Count objects/bytes per bucket without downloading bodies.
+
+    Returns (buckets, check). Missing credentials => incomplete with null counts.
+    A measured service failure (e.g. AccessDenied) => FAIL.
+    """
+    buckets = [{"name": n, "provider": "aws", "jurisdiction": "US-controlled",
+                "object_count": None, "total_bytes": None, "inventory": "not_run"}
+               for n in names]
+    if not names:
+        return buckets, {"id": "bucket_inventory", "status": "incomplete",
+                         "detail": "no source bucket identified in IaC, code or config"}
+    if not (config.get("SKYSHIFT_SOURCE_ACCESS_KEY_ID")
+            and config.get("SKYSHIFT_SOURCE_SECRET_ACCESS_KEY")):
+        return buckets, {"id": "bucket_inventory", "status": "incomplete",
+                         "detail": "source credentials not supplied; counts unknown, not zero"}
+    try:
+        client = _source_client(config)
+    except ImportError:
+        return buckets, {"id": "bucket_inventory", "status": "incomplete",
+                         "detail": "boto3 not installed; inventory not run"}
+
+    failures = []
+    for bucket in buckets:
+        count = size = 0
+        try:
+            paginator = client.get_paginator("list_objects_v2")
+            for page in paginator.paginate(Bucket=bucket["name"]):
+                for obj in page.get("Contents", []) or []:
+                    count += 1
+                    size += int(obj.get("Size", 0))
+        except Exception as exc:  # botocore errors; recorded by code only
+            bucket["inventory"] = f"failed:{_error_code(exc)}"
+            failures.append(f"{bucket['name']}: {_error_code(exc)}")
+            continue
+        bucket.update(object_count=count, total_bytes=size, inventory="measured")
+    if failures:
+        return buckets, {"id": "bucket_inventory", "status": "FAIL",
+                         "detail": "source listing failed: " + "; ".join(failures)}
+    return buckets, {"id": "bucket_inventory", "status": "PASS",
+                     "detail": f"{len(buckets)} bucket(s) listed read-only with pagination"}
+
+
+# --------------------------------------------------------------------------- discover
+
+
+def _bucket_names(resources: list[dict], calls: list[dict], config: dict) -> list[str]:
+    names: list[str] = []
+    for r in resources:
+        if r["type"] == "aws_s3_bucket":
+            name = r["attributes"].get("bucket")
+            if isinstance(name, str) and name not in names:
+                names.append(name)
+    for c in calls:
+        if c["service"] == "s3" and isinstance(c.get("bucket"), str) and c["bucket"] not in names:
+            names.append(c["bucket"])
+    configured = config.get("SKYSHIFT_SOURCE_BUCKET")
+    if isinstance(configured, str) and configured and configured not in names:
+        names.append(configured)
+    return names
+
+
+def _live_discover(workload: Path, config: dict) -> dict:
+    if not workload.is_dir():
+        raise ValueError("workload must be an existing directory")
+    display = workload.as_posix()
+    errors: list[str] = []
+    try:
+        catalogue = load_catalogue()
+        resources, hcl_findings = parse_hcl(workload, catalogue, display)
+    except ImportError as exc:
+        missing = getattr(exc, "name", None) or "dependency"
+        data = {"resources": [], "calls": [], "buckets": [],
+                "readiness": {"score": None, "formula": READINESS_FORMULA,
+                              "proprietary": None, "unsupported": None, "us_calls": None}}
+        checks = [{"id": "inventory_parsed", "status": "incomplete",
+                   "detail": f"{missing} not installed; inventory unknown, not empty"}]
+        return _envelope("discover", "live", "incomplete", checks, data,
+                         [f"missing optional dependency: {missing}"])
+
+    s3_ops = frozenset(op for op, ok in catalogue["s3_operations"].items() if ok)
+    calls, py_findings = scan_python(workload, display)
+    findings = hcl_findings + py_findings
+
+    tf_count = len(_iter_tf_files(workload))
+    checks = [
+        {"id": "inventory_parsed",
+         "status": "incomplete" if tf_count == 0 or hcl_findings else "PASS",
+         "detail": (f"{tf_count} .tf file(s), {len(resources)} resource(s); "
+                    f"{len(hcl_findings)} unresolved finding(s); modules not evaluated")},
+        {"id": "calls_scanned",
+         "status": "incomplete" if py_findings else "PASS",
+         "detail": (f"{len(_iter_py_files(workload))} .py file(s) parsed with ast, not executed; "
+                    f"{len(calls)} call(s), {len(py_findings)} dynamic/unresolved finding(s)")},
+    ]
+    buckets, inventory_check = inventory_buckets(_bucket_names(resources, calls, config), config)
+    checks.append(inventory_check)
+    errors += [f"{c['id']}: {c['status']}: {c['detail']}" for c in checks
+               if c["status"] != "PASS"]
+
+    readiness = compute_readiness(resources, calls, s3_ops)
+    readiness["us_calls_scope"] = ("non-S3 calls to US-controlled hosts, including boto3 "
+                                   "clients on the SDK default AWS endpoint")
+    readiness["findings"] = len(findings)
+    data = {
+        "resources": resources,
+        "calls": calls,
+        "buckets": buckets,
+        "readiness": readiness,
+        "findings": findings,
+        "catalogue": "skyshift/catalogue/resources.yaml (mapping eligibility, not measured "
+                     "target compatibility)",
+    }
+    return _envelope("discover", "live", _overall(checks), checks, data, errors)
+
+
 def discover(workload: Path, *, config: dict, stub: bool = False) -> dict:
     """Return a discover envelope whose data is the data map."""
     if not isinstance(workload, (Path, str)):
@@ -156,17 +750,10 @@ def discover(workload: Path, *, config: dict, stub: bool = False) -> dict:
         ]
         return _envelope("discover", "stub", "incomplete", checks, data, [])
 
-    data = {
-        "resources": [],
-        "calls": [],
-        "buckets": [],
-        "readiness": {"score": None, "formula": READINESS_FORMULA,
-                      "proprietary": None, "unsupported": None, "us_calls": None},
-    }
-    checks = [{"id": "inventory_parsed", "status": "incomplete",
-               "detail": "live discovery not implemented yet (WS1-02); inventory unknown"}]
-    return _envelope("discover", "live", "incomplete", checks, data,
-                     ["live discovery not implemented; inventory unknown, not empty"])
+    return _live_discover(workload, config)
+
+
+# --------------------------------------------------------------------------- choose
 
 
 def _require_keys(obj: object, keys: tuple, name: str) -> None:

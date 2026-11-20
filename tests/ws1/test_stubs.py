@@ -182,8 +182,12 @@ class StubPipelineTest(unittest.TestCase):
         ]
         for record in live:
             self.assertEqual(set(record), ENVELOPE_KEYS)
+            self.assertEqual(record["mode"], "live")
+            # No credentials/coverage: never an overall live PASS (individual measured
+            # checks may PASS once discovery is real, WS1-02).
             self.assertEqual(record["status"], "incomplete")
             self.assertTrue(record["errors"])
+        for record in live[1:]:  # choose/translate are still placeholders
             self.assertNotIn("PASS", list(_walk_statuses(record)))
         self.assertFalse((Path(self._tmp.name) / "live").exists())
 

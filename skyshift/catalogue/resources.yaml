@@ -1,0 +1,50 @@
+# SkyShift resource catalogue (WS1-owned). Format fixed by WS1-02:
+#   resources: AWS resource type -> supported, proprietary, target_kind, template
+#   s3_operations: S3 operation name -> supported
+# This is mapping eligibility, not measured target API compatibility. Correct it to
+# match the human-approved provider before real translation. Unknown resource types
+# default to unsupported/proprietary; unknown S3 operations default to unsupported.
+schema_version: 1
+resources:
+  aws_instance:
+    supported: true
+    proprietary: false
+    target_kind: compute_instance
+    template: compute.tf.j2
+  aws_security_group:
+    supported: true
+    proprietary: false
+    target_kind: network_security_group
+    template: network.tf.j2
+  aws_s3_bucket:
+    supported: true
+    proprietary: false
+    target_kind: object_storage_bucket
+    template: storage.tf.j2
+  aws_db_instance:
+    supported: false
+    proprietary: true
+    target_kind: null
+    template: null
+s3_operations:
+  put_object: true
+  get_object: true
+  head_object: true
+  delete_object: true
+  delete_objects: true
+  list_objects_v2: true
+  list_objects: true
+  list_buckets: true
+  head_bucket: true
+  copy_object: true
+  create_multipart_upload: true
+  upload_part: true
+  complete_multipart_upload: true
+  abort_multipart_upload: true
+  generate_presigned_url: true
+  upload_file: true
+  download_file: true
+  put_bucket_notification_configuration: false
+  select_object_content: false
+  restore_object: false
+  put_bucket_intelligent_tiering_configuration: false

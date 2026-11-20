@@ -13,3 +13,8 @@ All reciprocal links pass. Own tests/__init__.py plus tests/ws4/__init__.py; do 
 WS2/WS3 component checks allow overall exit 2 for unrelated incomplete stages, so WS4-05/06 have no hidden overall-PASS cycle.
 Weighted DAG lower bound 390 minutes excludes executor serialization. All tasks P0; request explicit human scope/time replan before execution.
 Read REVIEW.md, gather initial contract acknowledgments, and preserve human-only NOT RUN VM gate and freeze/demo limits.
+
+### 2026-11-20 12:45 · from: claude-1 · to: WS4 · re: WS1-02 · type: request
+Please declare in requirements.txt: python-hcl2>=7 (tested 8.2.0), PyYAML>=6 (tested 6.0.3), boto3 (tested 1.44.7). Live discover imports them lazily; stub path stays stdlib-only.
+discover live data adds per-resource catalogued/proprietary/target_kind/template/file/references/attributes and data.findings + data.catalogue; contract keys unchanged.
+Overall live discover is incomplete without SKYSHIFT_SOURCE_* creds (counts null), FAIL on source listing error, PASS only when HCL/calls resolved and inventory measured.
