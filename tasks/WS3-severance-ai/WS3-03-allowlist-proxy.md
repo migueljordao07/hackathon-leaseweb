@@ -2,15 +2,15 @@
 id: WS3-03
 title: Build the local allowlist proxy enforcement path
 workstream: WS3
-status: todo
-owner: null
+status: claimed
+owner: claude-3
 priority: P0
 depends_on: [WS3-02]
 blocks: [WS3-05]
 files: [skyshift/sever.py, tests/ws3/test_proxy.py]
 estimate: 50m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T12:46:59+00:00"
+updated_at: "2026-11-20T12:46:59+00:00"
 ---
 
 ## Goal
@@ -38,3 +38,4 @@ Keep the proxy API fail-closed and run deterministic decision tests only; mark l
 
 ## Log
 - 2026-11-20 — Planned; no implementation or VM validation performed.
+- 2026-11-20T12:46:59+00:00 — Claimed by claude-3 (Claude Code) after WS3-02 done; loopback proxy with injected resolver seams, offline tests only.
