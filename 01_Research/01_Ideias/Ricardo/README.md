@@ -1,8 +1,24 @@
-# Ricardo's Hackathon Ideas
+# Ricardo's Hackathon Ideas & Master Project Specification
 
-Ideas proposed by Ricardo or developed from his research prompts belong in this folder. Each idea card adheres strictly to the official [idea template](../idea-template.md) and addresses key themes of the Leaseweb × Velv hackathon: migration & sovereignty, AI-assisted operations, and security.
+This folder contains the individual research idea cards proposed by Ricardo, as well as the **final unified project specification selected for the hackathon**.
 
-The ideas below are ordered by priority and evaluated against market uniqueness and feasibility:
+---
+
+## 🏆 Selected Hackathon Project: SkyShift
+
+> **[Read the Master Engineering & Architecture Specification: `skyshift-unified-engine.md`](./skyshift-unified-engine.md)**  
+> **SkyShift** is the unified champion project synthesizing the best ideas across the entire team:
+> - **Ricardo:** IaC Transpiler & Sovereignty Pre-flight Auditor (`02-skyshift.md`, `01-sovereign-guard.md`)
+> - **Francisco:** Runtime Linux Kernel Socket & DNS Sovereignty Radar (`Francisco/01-sovereign-kernel-radar.md`)
+> - **Carolina:** S3 / SDK Semantic Parity Test Generator (`Carolina/01-ideia.template.md`)
+> - **Diogo:** Exit-Readiness Drill & Hidden SDK Trap Auditor (`Diogo/04-sovereign-exit-semantic-auditor.md`)
+> - **Miguel:** Outcome Verification & Ephemeral Rehearsal Sandbox (`Miguel/01-operation-outcome-verifier.md`, `Miguel/05-change-rehearsal-lab.md`)
+
+---
+
+## Individual Idea Cards (Archive)
+
+The initial exploratory cards below follow the official [idea template](../idea-template.md):
 
 | ID | Idea | Main Question & Focus | Market Uniqueness | Initial Assessment | Relative Effort |
 |---|---|---|---|---|---|
@@ -11,11 +27,5 @@ The ideas below are ordered by priority and evaluated against market uniqueness 
 | 03 | [CloudShrink](./03-cloudshrink.md) | Can an autonomous agent safely identify and prune zombie cloud resources? | **Low (Crowded)** · Heavily addressed by Cloud Custodian, Cast AI, and CSPs. | 16.5/20 | Medium |
 | 04 | [SRE-Healer](./04-sre-healer.md) | Can an agent diagnose host-level Linux outages and safely remediate them? | **Medium** · Competing with HolmesGPT and AWS DevOps Agent, but excellent live demo. | 18.5/20 | Medium |
 | 05 | [LeastPrivilege AI](./05-least-privilege.md) | Can access logs automatically reduce overly permissive IAM policies to Zero-Trust? | **Low (Covered)** · AWS IAM Access Analyzer already generates policies from CloudTrail. | 15.5/20 | Low-Medium |
-
-## Assessment Summary
-
-- **Top Recommendations for the Hackathon:**
-  - **SkyShift (ID 02)** and **SovereignGuard (ID 01)** target completely unaddressed market gaps, align directly with the European sovereignty and EU Data Act themes, and offer immense commercial synergy with Leaseweb's cloud infrastructure business.
-  - **SRE-Healer (ID 04)** provides the most dynamic live stage demo (injecting and fixing a crash live on the supplied Leaseweb Linux VM).
 
 Scores are preliminary AI assessments using the four equally weighted [official criteria](../../../00_Context/challenge-and-guidelines.md). They are discussion aids, not jury predictions or team votes.
