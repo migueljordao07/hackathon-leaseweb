@@ -2,15 +2,15 @@
 id: WS2-01
 title: Contract-honouring data and parity stubs
 workstream: WS2
-status: todo
-owner: null
+status: claimed
+owner: gemini
 priority: P0
 depends_on: []
 blocks: [WS2-02, WS3-07, WS4-01]
 files: [skyshift/migrate.py, skyshift/parity.py, tests/ws2/__init__.py, tests/ws2/test_stubs.py]
 estimate: 30m
-claimed_at: null
-updated_at: null
+claimed_at: "2026-11-20T12:35:55+00:00"
+updated_at: "2026-11-20T12:35:55+00:00"
 ---
 
 ## Goal
@@ -52,3 +52,4 @@ If another product module is unavailable, keep imports local or use JSON-compati
 ## Log
 
 - 2026-11-20 12:07 UTC — Planned as the independent WS2 stub. No product code or VM check has run.
+- 2026-11-20T12:35:55+00:00 — Claimed by gemini. Read AGENTS.md, tasks/README.md, tasks/contracts.md, tasks/REVIEW.md, tasks/comms/channel.md, and tasks/comms/inbox-WS2.md; contracts v1 acknowledged. Implementation starts after claim push is accepted.
