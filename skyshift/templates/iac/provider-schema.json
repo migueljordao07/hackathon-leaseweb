@@ -1,0 +1,14 @@
+{
+  "_comment": "Credential-free subset of the approved provider schema used for offline checks (WS1-04). Provider/version measured on the demo VM gate (tofu init installed openstack v3.4.0, signed). Attribute names follow the provider's documented resources; tofu validate on the VM is the authoritative check.",
+  "provider": "openstack",
+  "source": "terraform-provider-openstack/openstack",
+  "version_constraint": "~> 3.0",
+  "measured_version": "3.4.0",
+  "provenance_url": "https://registry.terraform.io/providers/terraform-provider-openstack/openstack/latest/docs",
+  "retrieved": "2026-11-20",
+  "resources": {
+    "openstack_networking_secgroup_v2": ["name", "description", "delete_default_rules", "tags"],
+    "openstack_networking_secgroup_rule_v2": ["direction", "ethertype", "protocol", "port_range_min", "port_range_max", "remote_ip_prefix", "security_group_id", "description"],
+    "openstack_compute_instance_v2": ["name", "image_name", "flavor_name", "security_groups", "metadata"]
+  }
+}

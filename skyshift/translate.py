@@ -3,10 +3,15 @@
 Contract: tasks/contracts.md (Python API, shared envelope, translated IaC).
 Standard library only. Importing this module performs no I/O, network or service start.
 
-Current state: offline stub only (WS1-01). ``stub=True`` writes a synthetic,
-non-deployable ``<output_dir>/iac/main.tf`` and reports ``offline_schema``
-validation with null exit codes; no tofu is executed. Non-stub calls return an
-explicit not-implemented incomplete envelope until WS1-04/WS1-05 land.
+``stub=True`` (WS1-01) writes a synthetic, non-deployable ``<output_dir>/iac/main.tf``
+and reports ``offline_schema`` validation with null exit codes; no tofu is executed.
+
+Live (WS1-04/05): renders aws_instance, aws_security_group and aws_s3_bucket into
+OpenStack templates (skyshift/templates/iac/) for the human-approved provider, then
+runs ``tofu init -backend=false -input=false`` and ``tofu validate -json`` once
+(30 s timeout each, no shell, no plan/apply/destroy). No AI repair loop (speed mode).
+Unresolved conversions (AMI -> image, instance size -> flavor, pre-provisioned
+storage) stay visible as manual rows and keep the record incomplete.
 """
 
 from __future__ import annotations
@@ -114,18 +119,7 @@ def translate(data_map: dict, target: dict, *, output_dir: Path, config: dict,
     provider = provider_value if provider_value in KNOWN_PROVIDER_MODES else "unselected"
 
     if not stub:
-        data = {
-            "provider": provider,
-            "files": [],
-            "resources": [],
-            "validation": {"method": "offline_schema", "init_exit": None, "validate_exit": None,
-                           "attempts": 0,
-                           "diagnostics": ["live translation not implemented yet (WS1-04)"]},
-        }
-        checks = [{"id": "iac_validated", "status": "incomplete",
-                   "detail": "live translation not implemented; no IaC generated"}]
-        return _envelope("translate", "live", "incomplete", checks, data,
-                         ["live translation not implemented"])
+        return _live_translate(data_map, target, output_dir=output_dir, config=config)
 
     mappings = [_map_resource(r, target.get("storage_mode")) for r in data_map["resources"]]
     iac_dir = output_dir / "iac"
@@ -155,3 +149,383 @@ def translate(data_map: dict, target: dict, *, output_dir: Path, config: dict,
          "detail": "offline_schema only; tofu validate not run"},
     ]
     return _envelope("translate", "stub", "incomplete", checks, data, [])
+
+
+# ------------------------------------------------------------- live translation (WS1-04/05)
+
+import json  # noqa: E402  (stdlib; kept with the live path for readability)
+import os  # noqa: E402
+import re  # noqa: E402
+import shutil  # noqa: E402
+
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates" / "iac"
+APPROVED_PROVIDERS = frozenset({"openstack"})
+TOFU_TIMEOUT_S = 30
+MAX_DIAGNOSTICS = 20
+MAX_DIAG_CHARS = 300
+VAR_REF = re.compile(r"\$\{var\.([A-Za-z_][A-Za-z0-9_]*)\}")
+SAFE_LABEL = re.compile(r"[^a-z0-9_]")
+PLACEHOLDER = re.compile(r"\{\{\s*([a-z_]+)\s*\}\}")
+SECRET_ENV_PREFIXES = ("AWS_", "OS_", "SKYSHIFT_", "LEASEWEB_")
+
+
+class Unresolvable(Exception):
+    """An attribute expression that cannot be translated safely."""
+
+
+def render_template(name: str, values: dict) -> str:
+    """Strict ``{{ name }}`` substitution: every placeholder must be supplied (pre-serialized)."""
+    text = (TEMPLATE_DIR / name).read_text(encoding="utf-8")
+
+    def sub(match):
+        key = match.group(1)
+        if key not in values:
+            raise ValueError(f"template {name}: undefined value {key}")
+        return values[key]
+
+    return PLACEHOLDER.sub(sub, text)
+
+
+def hcl_literal(value: str) -> str:
+    """HCL quoted string literal; escapes quotes, backslashes, newlines and template markers."""
+    out = (value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+           .replace("\r", "\\r").replace("\t", "\\t").replace("${", "$${").replace("%{", "%%{"))
+    return '"' + out + '"'
+
+
+def _strip_quotes(text: str) -> str:
+    if len(text) >= 2 and text[0] == text[-1] == '"':
+        return text[1:-1]
+    return text
+
+
+def hcl_value(value, used_vars: set) -> str:
+    """Serialize a discovered attribute value. Only literals and ``${var.x}`` are allowed."""
+    if isinstance(value, dict) and value.get("unresolved"):
+        expr = _strip_quotes(str(value.get("expression", "")))
+        parts, pos = [], 0
+        for m in VAR_REF.finditer(expr):
+            parts.append(("lit", expr[pos:m.start()]))
+            parts.append(("var", m.group(1)))
+            pos = m.end()
+        parts.append(("lit", expr[pos:]))
+        if any(kind == "lit" and ("${" in text or "%{" in text) for kind, text in parts):
+            raise Unresolvable("expression references something other than var.*")
+        names = [text for kind, text in parts if kind == "var"]
+        if not names:
+            raise Unresolvable("unsupported expression")
+        used_vars.update(names)
+        if len(parts) == 3 and parts[0][1] == "" and parts[2][1] == "":
+            return "var." + names[0]
+        body = "".join(hcl_literal(text)[1:-1] if kind == "lit" else "${var." + text + "}"
+                       for kind, text in parts)
+        return '"' + body + '"'
+    if isinstance(value, dict) and value.get("redacted"):
+        raise Unresolvable("sensitive attribute redacted at discovery")
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return json.dumps(value)
+    if isinstance(value, str):
+        return hcl_literal(value)
+    raise Unresolvable(f"unsupported value type {type(value).__name__}")
+
+
+def _label(source_id: str) -> str:
+    name = source_id.split(".", 1)[-1].lower()
+    label = SAFE_LABEL.sub("_", name) or "resource"
+    return label if not label[0].isdigit() else "r_" + label
+
+
+def _map_of(value, used_vars: set, dropped: list, prefix: str) -> str:
+    if not isinstance(value, dict) or value.get("unresolved") or value.get("redacted"):
+        return "{}"
+    items = []
+    for key in sorted(value):
+        try:
+            items.append(f"    {hcl_literal(str(key))} = {hcl_value(value[key], used_vars)}")
+        except Unresolvable as exc:
+            dropped.append(f"{prefix}.{key}: {exc}")
+    return "{\n" + "\n".join(items) + "\n  }" if items else "{}"
+
+
+def _tag_list(value, used_vars: set, dropped: list) -> str:
+    if not isinstance(value, dict) or value.get("unresolved"):
+        return "[]"
+    items = []
+    for key in sorted(value):
+        try:
+            val = hcl_value(value[key], used_vars)
+        except Unresolvable as exc:
+            dropped.append(f"tags.{key}: {exc}")
+            continue
+        if val.startswith('"'):
+            items.append('"' + hcl_literal(str(key))[1:-1] + "=" + val[1:])
+        else:
+            items.append('"' + hcl_literal(str(key))[1:-1] + "=${" + val + '}"')
+    return "[" + ", ".join(items) + "]"
+
+
+def _blocks(value) -> list[dict]:
+    if isinstance(value, dict):
+        return [value]
+    if isinstance(value, list):
+        return [b for b in value if isinstance(b, dict)]
+    return []
+
+
+def _render_rules(label: str, attrs: dict, used_vars: set) -> tuple[str, list[str]]:
+    """One openstack_networking_secgroup_rule_v2 per rule and CIDR; never broadened."""
+    out, manual = [], []
+    n = 0
+    for direction in ("ingress", "egress"):
+        for rule in _blocks(attrs.get(direction)):
+            if any(rule.get(k) for k in ("security_groups", "self", "prefix_list_ids",
+                                          "ipv6_cidr_blocks")):
+                manual.append(f"{direction} rule uses security_groups/self/prefix lists/IPv6; "
+                              "not translated")
+                continue
+            proto = str(rule.get("protocol", "")).strip('"').lower()
+            cidrs = rule.get("cidr_blocks") or []
+            if not isinstance(cidrs, list) or not cidrs or not all(
+                    isinstance(c, str) and re.fullmatch(r"[0-9.]+/\d{1,2}", c) for c in cidrs):
+                manual.append(f"{direction} rule has no literal IPv4 cidr_blocks")
+                continue
+            if proto not in ("tcp", "udp", "icmp", "-1", "all"):
+                manual.append(f"{direction} rule protocol {proto!r} unsupported")
+                continue
+            try:
+                lo, hi = int(rule.get("from_port", 0)), int(rule.get("to_port", 0))
+            except (TypeError, ValueError):
+                manual.append(f"{direction} rule ports are not literal integers")
+                continue
+            for cidr in cidrs:
+                n += 1
+                lines = [f'\nresource "openstack_networking_secgroup_rule_v2" "{label}_{direction}_{n}" {{',
+                         f'  direction         = "{direction}"',
+                         '  ethertype         = "IPv4"']
+                if proto in ("tcp", "udp", "icmp"):
+                    lines.append(f'  protocol          = "{proto}"')
+                    if proto != "icmp" and not (lo == 0 and hi == 0):
+                        lines.append(f"  port_range_min    = {lo}")
+                        lines.append(f"  port_range_max    = {hi}")
+                lines.append(f"  remote_ip_prefix  = {hcl_literal(cidr)}")
+                if isinstance(rule.get("description"), str):
+                    lines.append(f"  description       = {hcl_literal(rule['description'])}")
+                lines.append(f"  security_group_id = openstack_networking_secgroup_v2.{label}.id")
+                lines.append("}")
+                out.append("\n".join(lines))
+    return "\n".join(out), manual
+
+
+def _render_resources(resources: list[dict], storage_mode: str | None) -> tuple[str, list[dict], list[str]]:
+    by_id = {r.get("id"): r for r in resources}
+    used_vars: set = set()
+    blocks, rows, diagnostics = [], [], []
+    extra_vars: dict[str, str] = {}
+    labels = {}
+    for r in sorted(resources, key=lambda r: (r.get("type") != "aws_security_group", str(r.get("id")))):
+        rid, rtype = r.get("id"), r.get("type")
+        if not isinstance(rid, str) or not isinstance(rtype, str):
+            raise ValueError("each resource needs string id and type")
+        attrs = r.get("attributes") if isinstance(r.get("attributes"), dict) else {}
+        label = _label(rid)
+        safe_id = re.sub(r"[^A-Za-z0-9_.-]", "_", rid)
+        dropped: list[str] = []
+        row = {"source_id": rid, "target_type": None, "method": "manual", "status": "manual",
+               "manual_reason": None}
+        try:
+            if rtype == "aws_security_group":
+                rules, manual = _render_rules(label, attrs, used_vars)
+                name = hcl_value(attrs["name"], used_vars) if "name" in attrs else hcl_literal(label)
+                desc = (hcl_value(attrs["description"], used_vars) if "description" in attrs
+                        else hcl_literal("translated by SkyShift"))
+                blocks.append(render_template("network.tf.j2", {
+                    "source_id": safe_id, "label": label, "name": name, "description": desc,
+                    "tags": _tag_list(attrs.get("tags"), used_vars, dropped), "rules": rules}))
+                labels[rid] = label
+                row.update(target_type="openstack_networking_secgroup_v2")
+                if manual:
+                    row["manual_reason"] = "; ".join(manual)
+                else:
+                    row.update(method="template", status="mapped")
+            elif rtype == "aws_instance":
+                sgs = []
+                for ref in r.get("references", []):
+                    if ref in labels:
+                        sgs.append(f"openstack_networking_secgroup_v2.{labels[ref]}.name")
+                    elif by_id.get(ref, {}).get("type") == "aws_security_group":
+                        dropped.append(f"security group {ref} not translated")
+                image_var, flavor_var = f"{label}_image_name", f"{label}_flavor_name"
+                ami = attrs.get("ami")
+                itype = attrs.get("instance_type")
+                extra_vars[image_var] = "Leaseweb image name replacing the source AMI (operator input)"
+                extra_vars[flavor_var] = "Leaseweb flavor replacing the source instance type (operator input)"
+                name = hcl_value(attrs["tags"]["Name"], used_vars) if isinstance(
+                    attrs.get("tags"), dict) and "Name" in attrs["tags"] else hcl_literal(label)
+                blocks.append(render_template("compute.tf.j2", {
+                    "source_id": safe_id, "label": label, "name": name, "image_var": image_var,
+                    "flavor_var": flavor_var, "security_groups": "[" + ", ".join(sgs) + "]",
+                    "metadata": _map_of(attrs.get("tags"), used_vars, dropped, "tags")}))
+                row.update(target_type="openstack_compute_instance_v2",
+                           manual_reason=("rendered with operator inputs: no verified mapping from "
+                                          f"AMI {_describe(ami)} to a Leaseweb image or from "
+                                          f"instance type {_describe(itype)} to a flavor"))
+            elif rtype == "aws_s3_bucket":
+                target_type = storage_mode or "object_storage_bucket"
+                reason = ("Leaseweb Object Storage bucket is pre-provisioned outside OpenTofu "
+                          "(no verified OpenStack-provider resource for it); migrate copies into "
+                          "the configured target bucket" if storage_mode == "native_s3" else
+                          "separately operated S3 service and bucket must be set up manually")
+                blocks.append(render_template("storage.tf.j2", {
+                    "source_id": safe_id, "target_type": target_type, "reason": reason}))
+                row.update(target_type=target_type, manual_reason=reason)
+            else:
+                row["manual_reason"] = f"no template for {rtype}; AI gap-filling not run"
+        except Unresolvable as exc:
+            row.update(method="manual", status="manual", manual_reason=f"unresolvable attribute: {exc}")
+        if dropped:
+            row["dropped_attributes"] = dropped
+            diagnostics += [f"{rid}: dropped {d}" for d in dropped]
+        rows.append(row)
+    var_blocks = [f'\nvariable "{v}" {{\n  type = string\n}}' for v in sorted(used_vars)]
+    var_blocks += [f'\nvariable "{v}" {{\n  type        = string\n  description = {hcl_literal(d)}\n}}'
+                   for v, d in sorted(extra_vars.items())]
+    order = {r.get("id"): i for i, r in enumerate(resources)}
+    rows.sort(key=lambda row: order.get(row["source_id"], 0))
+    return "\n".join(var_blocks + blocks), rows, diagnostics
+
+
+def _describe(value) -> str:
+    if isinstance(value, dict) and value.get("unresolved"):
+        return "(expression " + _strip_quotes(str(value.get("expression")))[:60] + ")"
+    return repr(value)[:60]
+
+
+def find_tofu() -> str | None:
+    found = shutil.which("tofu")
+    if found:
+        return found
+    fallback = Path.home() / "skyshift-gate" / "bin" / "tofu"
+    return str(fallback) if fallback.is_file() and os.access(fallback, os.X_OK) else None
+
+
+def _tofu_env() -> dict:
+    env = {k: v for k, v in os.environ.items() if not k.startswith(SECRET_ENV_PREFIXES)}
+    env["TF_IN_AUTOMATION"] = "1"
+    env["CHECKPOINT_DISABLE"] = "1"
+    if "TF_PLUGIN_CACHE_DIR" not in env:
+        cache = Path.home() / ".skyshift" / "tofu-plugin-cache"
+        try:
+            cache.mkdir(parents=True, exist_ok=True)
+            env["TF_PLUGIN_CACHE_DIR"] = str(cache)
+        except OSError:
+            pass
+    return env
+
+
+def _clip(text: str) -> str:
+    text = " ".join(str(text).split())
+    return text[:MAX_DIAG_CHARS]
+
+
+def run_tofu(iac_dir: Path, tofu: str | None, runner=None) -> dict:
+    """One validation cycle. Returns the contract ``validation`` object (exit codes measured)."""
+    validation = {"method": "tofu", "init_exit": None, "validate_exit": None, "attempts": 0,
+                  "diagnostics": []}
+    if not tofu:
+        validation.update(method="offline_schema",
+                          diagnostics=["tofu binary not found; validation not run"])
+        return validation
+    if runner is None:
+        import subprocess
+
+        def runner(args, cwd, timeout):
+            proc = subprocess.run(args, cwd=str(cwd), env=_tofu_env(), capture_output=True,
+                                  text=True, timeout=timeout, stdin=subprocess.DEVNULL)
+            return proc.returncode, proc.stdout[-20000:], proc.stderr[-4000:]
+    validation["attempts"] = 1
+    try:
+        code, out, err = runner([tofu, "init", "-backend=false", "-input=false", "-no-color"],
+                                iac_dir, TOFU_TIMEOUT_S)
+    except Exception as exc:  # timeout or spawn failure
+        validation["diagnostics"].append(f"tofu init not completed: {type(exc).__name__}")
+        return validation
+    validation["init_exit"] = code
+    if code != 0:
+        validation["diagnostics"].append("tofu init failed: " + _clip(err or out))
+        return validation
+    try:
+        code, out, err = runner([tofu, "validate", "-json", "-no-color"], iac_dir, TOFU_TIMEOUT_S)
+    except Exception as exc:
+        validation["diagnostics"].append(f"tofu validate not completed: {type(exc).__name__}")
+        return validation
+    validation["validate_exit"] = code
+    try:
+        report = json.loads(out)
+        for d in report.get("diagnostics", [])[:MAX_DIAGNOSTICS]:
+            validation["diagnostics"].append(
+                _clip(f"{d.get('severity')}: {d.get('summary')} {d.get('detail') or ''}"))
+    except (ValueError, AttributeError):
+        if code != 0:
+            validation["diagnostics"].append("tofu validate failed: " + _clip(err or out))
+    return validation
+
+
+def _live_translate(data_map: dict, target: dict, *, output_dir: Path, config: dict,
+                    tofu: str | None = None, runner=None, find=find_tofu) -> dict:
+    provider = (config.get("SKYSHIFT_TARGET_PROVIDER") or target.get("provider") or "")
+    provider = str(provider).strip().lower()
+    if provider not in APPROVED_PROVIDERS or not target.get("target_id"):
+        data = {"provider": provider or "unselected", "files": [], "resources": [],
+                "validation": {"method": "offline_schema", "init_exit": None,
+                               "validate_exit": None, "attempts": 0,
+                               "diagnostics": ["no approved provider/target; nothing rendered"]}}
+        checks = [{"id": "iac_validated", "status": "incomplete",
+                   "detail": "no human-approved provider or target from choose"}]
+        return _envelope("translate", "live", "incomplete", checks, data,
+                         ["translate: no approved provider/target"])
+
+    body, rows, diagnostics = _render_resources(data_map["resources"], target.get("storage_mode"))
+    main_tf = output_dir / "iac" / "main.tf"
+    main_tf.parent.mkdir(parents=True, exist_ok=True)
+    text = render_template("provider.tf.j2", {"workload_note": "the discovered AWS data map"})
+    main_tf.write_text(text + body + "\n", encoding="utf-8", newline="\n")
+
+    validation = run_tofu(main_tf.parent, tofu if tofu is not None else find(), runner)
+    validation["diagnostics"] = diagnostics + validation["diagnostics"]
+    mapped = [r for r in rows if r["status"] == "mapped"]
+    manual = [r for r in rows if r["status"] == "manual"]
+    checks = [{"id": "templates_mapped",
+               "status": "PASS" if rows and not manual else "incomplete",
+               "detail": f"{len(mapped)} mapped by template, {len(manual)} manual of {len(rows)} "
+                         "discovered resource(s)"}]
+    if validation["method"] != "tofu":
+        checks.append({"id": "iac_validated", "status": "incomplete",
+                       "detail": "offline only: tofu not available, validate not run"})
+    elif validation["init_exit"] == 0 and validation["validate_exit"] == 0:
+        checks.append({"id": "iac_validated", "status": "PASS",
+                       "detail": "tofu init -backend=false exit 0; tofu validate exit 0 "
+                                 "(syntax/schema only; no plan/apply, no authentication)"})
+    elif validation["init_exit"] is None or (validation["init_exit"] == 0
+                                             and validation["validate_exit"] is None):
+        checks.append({"id": "iac_validated", "status": "incomplete",
+                       "detail": "tofu did not complete (timeout/spawn failure)"})
+    else:
+        checks.append({"id": "iac_validated", "status": "FAIL",
+                       "detail": f"tofu init exit {validation['init_exit']}, validate exit "
+                                 f"{validation['validate_exit']}"})
+    data = {"provider": provider, "files": [main_tf.as_posix()], "resources": rows,
+            "validation": validation}
+    errors = [f"{c['id']}: {c['detail']}" for c in checks if c["status"] != "PASS"]
+    errors += [f"manual: {r['source_id']}: {r['manual_reason']}" for r in manual]
+    return _envelope("translate", "live", _overall(checks), checks, data, errors)
+
+
+def _overall(checks: list[dict]) -> str:
+    statuses = [c["status"] for c in checks]
+    if "FAIL" in statuses:
+        return "FAIL"
+    if statuses and all(s == "PASS" for s in statuses):
+        return "PASS"
+    return "incomplete"

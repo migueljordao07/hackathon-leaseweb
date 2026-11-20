@@ -1,0 +1,9 @@
+
+# {{ source_id }} -> openstack_networking_secgroup_v2 (template)
+resource "openstack_networking_secgroup_v2" "{{ label }}" {
+  name                 = {{ name }}
+  description          = {{ description }}
+  delete_default_rules = true
+  tags                 = {{ tags }}
+}
+{{ rules }}
