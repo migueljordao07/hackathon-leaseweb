@@ -292,19 +292,46 @@ def _display_path(path: Path, workload: Path, workload_display: str) -> str:
     return f"{workload_display}/{rel}" if workload_display not in ("", ".") else rel
 
 
+VAR_ONLY = re.compile(r"\$\{var\.([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def _variable_defaults(docs: list) -> dict:
+    """Literal (non-expression) variable defaults declared in the workload."""
+    defaults: dict = {}
+    for _display, doc in docs:
+        for block in doc.get("variable", []):
+            for name, body in block.items():
+                if isinstance(body, dict) and "default" in body:
+                    value, unresolved = _hcl_value(body["default"])
+                    if not unresolved and isinstance(value, (str, int, float, bool)):
+                        defaults[_hcl_label(name)] = value
+    return defaults
+
+
+def _resolvable(expr: str, var_defaults: dict) -> bool:
+    """True when the expression only interpolates variables with literal defaults."""
+    names = VAR_ONLY.findall(expr)
+    rest = VAR_ONLY.sub("", expr)
+    return bool(names) and "${" not in rest and "%{" not in rest and all(
+        n in var_defaults for n in names)
+
+
 def parse_hcl(workload: Path, catalogue: dict, workload_display: str) -> tuple[list, list]:
     """Return (resources, findings). Malformed HCL raises ValueError."""
     import hcl2  # optional dependency, live path only
 
     resources: list[dict] = []
     findings: list[dict] = []
+    docs = []
     for tf in _iter_tf_files(workload):
         display = _display_path(tf, workload, workload_display)
         try:
             with open(tf, encoding="utf-8") as handle:
-                doc = hcl2.load(handle)
+                docs.append((display, hcl2.load(handle)))
         except Exception as exc:  # lark/hcl2 raise several exception types
             raise ValueError(f"invalid HCL in {display}: {type(exc).__name__}") from None
+    var_defaults = _variable_defaults(docs)
+    for display, doc in docs:
 
         provider_regions: dict[str, object] = {}
         for block in doc.get("provider", []):
@@ -360,7 +387,7 @@ def parse_hcl(workload: Path, catalogue: dict, workload_display: str) -> tuple[l
                         findings.append({"file": display, "kind": "unresolved_region",
                                          "detail": f"{rid}: no literal provider region"})
                     for expr in unresolved:
-                        if not RESOURCE_REF.search(expr):
+                        if not RESOURCE_REF.search(expr) and not _resolvable(expr, var_defaults):
                             findings.append({"file": display, "kind": "unresolved_expression",
                                              "detail": f"{rid}: expression not evaluated"})
                             break

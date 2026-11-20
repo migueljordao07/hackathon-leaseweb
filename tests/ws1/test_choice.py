@@ -138,3 +138,12 @@ class ChoiceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VariableResolutionTest(unittest.TestCase):
+    def test_var_with_literal_default_is_resolvable(self):
+        from skyshift.discover import _resolvable
+        self.assertTrue(_resolvable('"${var.a}-sg"', {"a": "x"}))
+        self.assertFalse(_resolvable("${var.missing}", {"a": "x"}))
+        self.assertFalse(_resolvable('${upper(var.a)}', {"a": "x"}))
+        self.assertFalse(_resolvable('${var.a}${local.b}', {"a": "x"}))
